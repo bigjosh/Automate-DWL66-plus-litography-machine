@@ -44,3 +44,6 @@ Do these before starting the script
 The script starts in single step mode so you have to click next for each step.
 
 Once you feel confident that it is working, then you can click the button to run continuously. It will sound an alarm and stop if any tests fail.
+
+# Coordinate System
+<img width="537" height="515" alt="2026-08-12_15h47_07" src="https://github.com/user-attachments/assets/63a60064-1910-4081-aba9-0126617dd2a7" />
