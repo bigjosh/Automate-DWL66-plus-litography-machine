@@ -1,0 +1,1359 @@
+===== 2026-08-11 18:54:23 -- log opened by real-dwl.py =====
+[18:54:23] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[18:54:23] Connecting to the browser
+Traceback (most recent call last):
+  File "D:\Github\Playwritght-Script\real-dwl.py", line 16, in <module>
+    xpos = (c - 2.5) * 28489
+            ^
+NameError: name 'c' is not defined
+*** ALARM: Script error: NameError: name 'c' is not defined
+*** Alarm answered: Acknowledge
+===== 2026-08-11 18:54:55 -- log opened by real-dwl.py =====
+[18:54:55] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[18:54:55] Connecting to the browser
+[18:54:56] Click at (2312, 742) -- center
+[18:54:58] Click at (1417, 466) -- execute global alignment
+[18:54:58] Double click at (1393, 868) -- click X
+[18:54:58] Send keys '-71222.5' -- xval
+Traceback (most recent call last):
+  File "D:\Github\Playwritght-Script\real-dwl.py", line 34, in <module>
+    psl.sendkeys(xpos)
+    ~~~~~~~~~~~~^^^^^^
+  File "D:\Github\Playwritght-Script\playwrightscriptlib.py", line 169, in sendkeys
+    normalized = text.replace("\r\n", "\r").replace("\n", "\r")
+                 ^^^^^^^^^^^^
+AttributeError: 'float' object has no attribute 'replace'
+*** ALARM: Script error: AttributeError: 'float' object has no attribute 'replace'
+*** Alarm answered: Acknowledge
+===== 2026-08-11 18:57:17 -- log opened by real-dwl.py =====
+[18:57:17] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[18:57:17] Connecting to the browser
+[18:57:17] Click at (2312, 742) -- center
+[18:57:19] Click at (1417, 466) -- execute global alignment
+[18:57:19] Double click at (1393, 868) -- click X
+[18:57:19] Send keys '-71222.5' -- xval
+[18:57:19] Double click at (1454, 883) -- y
+[18:57:19] Send keys '71222.5' -- yval
+Traceback (most recent call last):
+  File "D:\Github\Playwritght-Script\real-dwl.py", line 44, in <module>
+    input()
+    ~~~~~^^
+KeyboardInterrupt
+*** ALARM: Script error: KeyboardInterrupt
+*** Alarm answered: Acknowledge
+===== 2026-08-11 19:01:15 -- log opened by real-dwl.py =====
+[19:01:15] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[19:01:15] Connecting to the browser
+[19:01:16] Click at (2312, 742) -- center
+[19:01:18] Click at (1417, 466) -- execute global alignment
+[19:01:19] Double click at (1393, 868) -- click X
+[19:01:19] Send keys '-71222.5' -- xval
+[19:01:19] Double click at (1454, 883) -- y
+[19:01:19] Send keys '71222.5' -- yval
+Traceback (most recent call last):
+  File "D:\Github\Playwritght-Script\real-dwl.py", line 46, in <module>
+    input()
+    ~~~~~^^
+KeyboardInterrupt
+*** ALARM: Script error: KeyboardInterrupt
+*** Alarm answered: Acknowledge
+===== 2026-08-11 19:27:39 -- log opened by real-dwl.py =====
+[19:27:39] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[19:27:39] Connecting to the browser
+[19:27:39] Click at (2312, 742) -- center
+[19:27:41] Click at (1417, 466) -- execute global alignment
+[19:27:42] Double click at (1393, 868) -- click X
+[19:27:42] Send keys '-71222.5' -- xval
+[19:27:42] Double click at (1454, 883) -- y
+[19:27:42] Send keys '71222.5' -- yval
+Traceback (most recent call last):
+  File "D:\Github\Playwritght-Script\real-dwl.py", line 54, in <module>
+    input()
+    ~~~~~^^
+KeyboardInterrupt
+*** ALARM: Script error: KeyboardInterrupt
+*** Alarm answered: Acknowledge
+===== 2026-08-11 19:28:54 -- log opened by real-dwl.py =====
+[19:28:54] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[19:28:54] Connecting to the browser
+[19:28:55] Click at (2312, 742) -- center
+[19:28:57] Click at (1417, 466) -- execute global alignment
+[19:28:58] Double click at (1393, 868) -- click X
+[19:28:58] Send keys '-71222.5' -- xval
+[19:28:58] Double click at (1454, 883) -- y
+[19:28:58] Send keys '71222.5' -- yval
+Traceback (most recent call last):
+  File "D:\Github\Playwritght-Script\real-dwl.py", line 54, in <module>
+    input()
+    ~~~~~^^
+KeyboardInterrupt
+*** ALARM: Script error: KeyboardInterrupt
+*** Alarm answered: Acknowledge
+===== 2026-08-11 19:45:53 -- log opened by real-dwl.py =====
+[19:45:53] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[19:45:53] Connecting to the browser
+[19:45:54] Click at (2312, 742) -- center
+[19:45:56] Click at (1417, 466) -- execute global alignment
+[19:45:57] Double click at (1393, 868) -- click X
+[19:45:57] Send keys -71222 -- xval
+[19:45:57] Double click at (1454, 883) -- y
+[19:45:57] Send keys 42733 -- yval
+[19:45:57] Click at (1707, 936) -- move absolute
+[19:45:57] Wait 2 second(s) -- wait for move abs
+[19:45:59] Click at (2262, 869) -- focus
+[19:45:59] Wait 150 second(s) -- 150
+Traceback (most recent call last):
+  File "D:\Github\Playwritght-Script\real-dwl.py", line 67, in <module>
+    psl.wait(150)
+    ~~~~~~~~^^^^^
+  File "D:\Github\Playwritght-Script\playwrightscriptlib.py", line 506, in wait
+    time.sleep(float(seconds))
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+*** ALARM: Script error: KeyboardInterrupt
+*** Alarm answered: Acknowledge
+===== 2026-08-11 19:55:25 -- log opened by real-dwl.py =====
+[19:55:25] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[19:55:25] Connecting to the browser
+[19:55:25] Click at (2312, 742) -- center
+[19:55:27] Click at (1417, 466) -- execute global alignment
+[19:55:28] Double click at (1393, 868) -- click X
+[19:55:28] Send keys -71222 -- xval
+[19:55:28] Double click at (1454, 883) -- y
+[19:55:28] Send keys 42733 -- yval
+[19:55:29] Click at (1707, 936) -- move absolute
+[19:55:29] Wait 2 second(s) -- wait for move abs
+[19:55:31] Click at (2262, 869) -- focus
+[19:55:31] Wait 150 second(s) -- 150
+Traceback (most recent call last):
+  File "D:\Github\Playwritght-Script\real-dwl.py", line 67, in <module>
+    psl.wait(150)
+    ~~~~~~~~^^^^^
+  File "D:\Github\Playwritght-Script\playwrightscriptlib.py", line 506, in wait
+    time.sleep(float(seconds))
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+*** ALARM: Script error: KeyboardInterrupt
+*** Alarm answered: Acknowledge
+===== 2026-08-11 20:02:52 -- log opened by real-dwl.py =====
+[20:02:52] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[20:02:52] Connecting to the browser
+[20:02:53] Step mode on -- pausing at every step
+[20:02:53] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[20:03:03] Click at (2312, 742) -- center
+[20:04:33] Click at (1417, 466) -- execute global alignment
+[20:05:47] Script stopped by operator (step mode)
+===== 2026-08-11 20:41:48 -- log opened by real-dwl.py =====
+[20:41:48] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[20:41:48] Connecting to the browser
+[20:41:48] Step mode on -- pausing at every step
+[20:41:48] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[20:41:56] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[20:42:29] Click at (2312, 742) -- center
+[20:42:48] Click at (1417, 466) -- execute global alignment
+[20:42:58] Double click at (1393, 868) -- click X
+[20:43:05] Send keys -71222 -- xval
+[20:43:11] Double click at (1454, 883) -- y
+[20:43:18] Send keys 42733 -- yval
+[20:43:20] Click at (1707, 936) -- move absolute
+[20:43:36] Wait 2 second(s) -- wait for move abs
+[20:43:44] Click at (2262, 869) -- focus
+[20:43:54] Wait 150 second(s) -- 150
+[20:46:30] Click at (1344, 467) -- alignments tab
+[20:47:05] Click at (2156, 538) -- execute
+[20:48:59] Wait 1 second(s) -- align modal
+[20:49:08] Click at (1953, 796) -- really execute find center
+[20:49:11] Wait 60 second(s) -- wait for alignment
+[20:51:18] Click at (1294, 464) -- job tab
+[20:53:08] Click at (1529, 484) -- start job button
+[20:56:22] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[20:56:42] Click at (1914, 797) -- START WRITING
+[20:56:45] Wait 780 second(s) -- The actual write job running
+[21:09:47] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[21:09:53] Click at (1970, 797) -- Job done OK
+[21:09:56] Wait 1 second(s) -- pause
+[21:10:01] Click at (1820, 821) -- Process finished OK
+[21:10:06] Wait 1 second(s) -- pause
+[21:10:10] Script finished
+===== 2026-08-11 21:13:30 -- log opened by real-dwl.py =====
+[21:13:30] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[21:13:30] Connecting to the browser
+[21:13:30] Click settle time set to 1s
+[21:13:30] Step mode on -- pausing at every step
+[21:13:30] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[21:13:34] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[21:13:37] Click at (2312, 742) -- center
+Traceback (most recent call last):
+  File "D:\Github\Playwritght-Script\real-dwl.py", line 41, in <module>
+    input()
+    ~~~~~^^
+KeyboardInterrupt
+*** ALARM: Script error: KeyboardInterrupt
+*** Alarm answered: Acknowledge
+===== 2026-08-11 21:14:24 -- log opened by real-dwl.py =====
+[21:14:24] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[21:14:24] Connecting to the browser
+[21:14:25] Click settle time set to 1s
+[21:14:25] Step mode on -- pausing at every step
+[21:14:25] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[21:14:29] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[21:14:30] Click at (2312, 742) -- center
+[21:14:36] Click at (1417, 466) -- execute global alignment
+[21:14:45] Double click at (1393, 868) -- click X
+[21:15:32] Send keys -71222 -- xval
+[21:15:45] Double click at (1454, 883) -- y
+[21:15:51] Send keys 14244 -- yval
+[21:16:04] Click at (1707, 936) -- move absolute
+[21:16:37] Script stopped by operator (step mode)
+===== 2026-08-11 21:20:32 -- log opened by real-dwl.py =====
+[21:20:32] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[21:20:32] Connecting to the browser
+[21:20:32] Click settle time set to 1s
+[21:20:32] Step mode on -- pausing at every step
+[21:20:32] *** Starting cycle for row 2, column 0 ***
+[21:20:42] Calculated x position -71222 and y position 14244
+[21:21:05] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[21:21:10] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[21:21:17] Click at (2312, 742) -- center
+[21:21:21] Click at (1417, 466) -- execute global alignment
+[21:21:35] Double click at (1393, 868) -- click X
+[21:21:42] Send keys -71222 -- xval
+[21:21:44] Double click at (1454, 883) -- y
+[21:21:47] Send keys 14244 -- yval
+[21:21:48] Click at (1707, 936) -- move absolute
+[21:21:54] Wait 2 second(s) -- wait for move abs
+[21:22:17] Click at (2262, 869) -- focus
+[21:22:25] Script stopped by operator (step mode)
+===== 2026-08-11 21:22:49 -- log opened by real-dwl.py =====
+[21:22:49] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[21:22:49] Connecting to the browser
+[21:22:49] Click settle time set to 1s
+[21:22:49] Step mode on -- pausing at every step
+[21:22:49] *** Starting cycle for row 2, column 0 ***
+[21:22:53] Calculated x position -71222 and y position 14244
+[21:22:54] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[21:22:56] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[21:22:58] Click at (2312, 742) -- center
+[21:23:02] Click at (1417, 466) -- execute global alignment
+[21:23:07] Double click at (1393, 868) -- click X
+[21:23:09] Send keys -71222 -- xval
+[21:23:12] Double click at (1454, 883) -- y
+[21:23:15] Send keys 14244 -- yval
+[21:23:18] Click at (1707, 936) -- move absolute
+[21:23:21] Wait 2 second(s) -- wait for move abs
+[21:23:24] Click at (2262, 869) -- focus
+[21:23:34] Wait 150 second(s) -- 150
+[21:25:57] Script aborted by operator during wait
+===== 2026-08-11 21:27:45 -- log opened by real-dwl.py =====
+[21:27:45] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[21:27:45] Connecting to the browser
+[21:27:46] Click settle time set to 1s
+[21:27:46] Step mode on -- pausing at every step
+[21:27:46] *** Starting cycle for row 2, column 0 ***
+[21:28:10] Calculated x position -71222 and y position 14244
+[21:28:13] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[21:28:17] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[21:28:20] Click at (2312, 742) -- center
+[21:28:26] Click at (1417, 466) -- execute global alignment
+[21:28:31] Double click at (1393, 868) -- click X
+[21:28:34] Send keys -71222 -- xval
+[21:28:35] Double click at (1454, 883) -- y
+[21:28:37] Send keys 14244 -- yval
+[21:28:38] Click at (1707, 936) -- move absolute
+[21:28:41] Wait 2 second(s) -- wait for move abs
+[21:28:46] Click at (2262, 869) -- focus
+[21:28:58] Wait 150 second(s) -- 150
+[21:31:07] Wait skipped by operator (25s remaining)
+[21:31:07] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[21:31:11] Click at (1344, 467) -- alignments tab
+[21:31:16] Click at (2156, 538) -- execute
+[21:31:19] Wait 1 second(s) -- align modal
+[21:31:22] Click at (1953, 796) -- really execute find center
+[21:31:27] Wait 60 second(s) -- wait for alignment
+[21:32:30] Click at (1294, 464) -- job tab
+[21:32:33] Click at (1529, 484) -- start job button
+[21:32:50] Wait 3 second(s) -- wait for laser confirm popup
+[21:32:58] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[21:33:01] Click at (1914, 797) -- START WRITING
+[21:33:04] Wait 780 second(s) -- The actual write job running
+[21:46:07] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[21:46:13] Click at (1970, 797) -- Job done OK
+[21:46:16] Wait 1 second(s) -- pause
+[21:46:19] Screen test 'finishedok' (matchLevel 0.99) -- process finished modal ok button
+*** ALARM: Screen does not match finishedok  (similarity 0.1760, needs at least 0.99)
+*** Alarm answered: Show differences
+*** ALARM: Screen does not match finishedok  (similarity 0.1760, needs at least 0.99)
+*** Alarm answered: Stop the script
+[21:56:11] Script stopped by operator
+[21:56:16] Script stopped by operator (step mode)
+===== 2026-08-11 22:00:46 -- log opened by real-dwl.py =====
+[22:00:46] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[22:00:46] Connecting to the browser
+[22:00:46] Click settle time set to 1s
+[22:00:46] Step mode on -- pausing at every step
+[22:00:46] *** Starting cycle for row 2, column 0 ***
+[22:00:50] Script stopped by operator (step mode)
+===== 2026-08-11 22:01:01 -- log opened by real-dwl.py =====
+[22:01:01] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[22:01:01] Connecting to the browser
+[22:01:01] Click settle time set to 1s
+[22:01:01] Step mode on -- pausing at every step
+[22:01:01] *** Starting cycle for row 3, column 0 ***
+[22:01:05] Calculated x position -71222 and y position -14244
+[22:01:07] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[22:01:09] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[22:01:10] Click at (2312, 742) -- center
+[22:01:14] Click at (1417, 466) -- execute global alignment
+[22:01:19] Double click at (1393, 868) -- click X
+[22:01:21] Send keys -71222 -- xval
+[22:01:22] Double click at (1454, 883) -- y
+[22:01:24] Send keys -14244 -- yval
+[22:01:25] Click at (1707, 936) -- move absolute
+[22:01:47] Wait 2 second(s) -- wait for move abs
+[22:02:33] Click at (2262, 869) -- focus
+[22:02:38] Wait 150 second(s) -- 150
+[22:04:56] Wait skipped by operator (15s remaining)
+[22:04:56] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[22:04:59] Click at (1344, 467) -- alignments tab
+[22:05:01] Click at (2156, 538) -- execute
+[22:05:03] Wait 1 second(s) -- align modal
+[22:05:07] Click at (1953, 796) -- really execute find center
+[22:05:11] Wait 60 second(s) -- wait for alignment
+[22:06:19] Click at (1294, 464) -- job tab
+[22:06:26] Click at (1529, 484) -- start job button
+[22:06:34] Wait 3 second(s) -- wait for laser confirm popup
+[22:06:40] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[22:06:42] Click at (1914, 797) -- START WRITING
+[22:06:44] Wait 780 second(s) -- The actual write job running
+[22:18:26] Wait skipped by operator (1:19 remaining)
+[22:18:26] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[22:18:41] Click at (1970, 797) -- Job done OK
+[22:18:46] Wait 1 second(s) -- pause
+[22:18:51] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[22:18:57] Press space bar to hopefully clear job complete modal
+[22:19:00] Wait 1 second(s) -- pause
+[22:19:03] Script finished
+===== 2026-08-11 22:19:18 -- log opened by real-dwl.py =====
+[22:19:18] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[22:19:18] Connecting to the browser
+[22:19:18] Click settle time set to 1s
+[22:19:18] Step mode on -- pausing at every step
+[22:19:18] *** Starting cycle for row 4, column 0 ***
+[22:19:24] Calculated x position -71222 and y position -42733
+[22:19:27] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[22:19:30] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[22:19:31] Click at (2312, 742) -- center
+[22:19:35] Click at (1417, 466) -- execute global alignment
+[22:19:40] Double click at (1393, 868) -- click X
+[22:19:42] Send keys -71222 -- xval
+[22:19:46] Double click at (1454, 883) -- y
+[22:19:48] Send keys -42733 -- yval
+[22:19:51] Click at (1707, 936) -- move absolute
+[22:19:56] Wait 2 second(s) -- wait for move abs
+[22:20:04] Click at (2262, 869) -- focus
+[22:20:07] Wait 150 second(s) -- 150
+[22:22:09] Wait skipped by operator (30s remaining)
+[22:22:09] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+*** ALARM: Screen does not match focusready  (similarity 0.3690, needs at least 0.99)
+*** Alarm answered: Show differences
+*** ALARM: Screen does not match focusready  (similarity 0.3690, needs at least 0.99)
+*** Alarm answered: Try compare again
+[22:22:53] Retrying compare...
+[22:22:58] Click at (1344, 467) -- alignments tab
+[22:23:01] Click at (2156, 538) -- execute
+[22:23:04] Wait 1 second(s) -- align modal
+[22:23:07] Click at (1953, 796) -- really execute find center
+[22:23:09] Wait 60 second(s) -- wait for alignment
+[22:24:10] Click at (1294, 464) -- job tab
+[22:24:14] Click at (1529, 484) -- start job button
+[22:24:18] Wait 3 second(s) -- wait for laser confirm popup
+[22:24:24] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[22:24:26] Click at (1914, 797) -- START WRITING
+[22:24:28] Wait 780 second(s) -- The actual write job running
+[22:37:30] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[22:40:48] Click at (1970, 797) -- Job done OK
+[22:40:51] Wait 1 second(s) -- pause
+[22:40:53] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[22:40:54] Press space bar to hopefully clear job complete modal
+[22:40:56] Wait 1 second(s) -- pause
+[22:40:59] Script finished
+===== 2026-08-11 22:41:08 -- log opened by real-dwl.py =====
+[22:41:08] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[22:41:08] Connecting to the browser
+[22:41:09] Click settle time set to 1s
+[22:41:09] Step mode on -- pausing at every step
+[22:41:09] *** Starting cycle for row 5, column 0 ***
+[22:41:12] Calculated x position -71222 and y position -71222
+[22:41:13] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[22:41:14] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[22:41:16] Click at (2312, 742) -- center
+[22:41:17] Running continuously -- step mode off
+[22:41:20] Click at (1417, 466) -- execute global alignment
+[22:41:22] Double click at (1393, 868) -- click X
+[22:41:23] Send keys -71222 -- xval
+[22:41:23] Double click at (1454, 883) -- y
+[22:41:24] Send keys -71222 -- yval
+[22:41:25] Click at (1707, 936) -- move absolute
+[22:41:26] Wait 2 second(s) -- wait for move abs
+[22:41:28] Click at (2262, 869) -- focus
+[22:41:29] Wait 240 second(s) for focus to complete
+[22:45:29] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[22:45:29] Click at (1344, 467) -- alignments tab
+[22:45:30] Click at (2156, 538) -- execute
+[22:45:31] Wait 1 second(s) -- align modal
+[22:45:32] Click at (1953, 796) -- really execute find center
+[22:45:33] Wait 60 second(s) -- wait for alignment
+[22:46:34] Click at (1294, 464) -- job tab
+[22:46:35] Click at (1529, 484) -- start job button
+[22:46:36] Wait 3 second(s) -- wait for laser confirm popup
+[22:46:39] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[22:46:39] Click at (1914, 797) -- START WRITING
+[22:46:40] Wait 780 second(s) -- The actual write job running
+[22:59:40] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[22:59:41] Click at (1970, 797) -- Job done OK
+[22:59:42] Wait 1 second(s) -- pause
+[22:59:43] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[22:59:43] Press space bar to hopefully clear job complete modal
+[22:59:43] Wait 1 second(s) -- pause
+[22:59:44] Script finished
+===== 2026-08-11 23:02:38 -- log opened by real-dwl.py =====
+[23:02:38] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[23:02:38] Connecting to the browser
+[23:02:39] Click settle time set to 1s
+[23:02:39] Step mode on -- pausing at every step
+[23:02:39] *** Starting cycle for row 0, column 1 ***
+[23:03:12] Calculated x position -42733 and y position 71222
+[23:03:24] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[23:03:25] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[23:03:29] Click at (2312, 742) -- center
+[23:03:33] Click at (1417, 466) -- execute global alignment
+[23:03:38] Double click at (1393, 868) -- click X
+[23:03:40] Send keys -42733 -- xval
+[23:03:41] Double click at (1454, 883) -- y
+[23:03:43] Send keys 71222 -- yval
+[23:03:44] Click at (1707, 936) -- move absolute
+[23:03:47] Wait 2 second(s) -- wait for move abs
+[23:03:54] Click at (2262, 869) -- focus
+[23:03:56] Wait 240 second(s) for focus to complete
+[23:07:57] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[23:10:50] Click at (1344, 467) -- alignments tab
+[23:10:52] Click at (2156, 538) -- execute
+[23:10:54] Wait 1 second(s) -- align modal
+[23:10:57] Click at (1953, 796) -- really execute find center
+[23:11:00] Wait 60 second(s) -- wait for alignment
+[23:12:02] Click at (1294, 464) -- job tab
+[23:19:27] Click at (1529, 484) -- start job button
+[23:19:34] Wait 3 second(s) -- wait for laser confirm popup
+[23:19:41] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[23:19:51] Click at (1914, 797) -- START WRITING
+[23:19:53] Wait 780 second(s) -- The actual write job running
+[23:31:51] Wait skipped by operator (1:38 remaining)
+[23:31:51] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[23:31:55] Click at (1970, 797) -- Job done OK
+[23:31:57] Wait 1 second(s) -- pause
+[23:31:59] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[23:32:00] Press space bar to hopefully clear job complete modal
+[23:32:01] Wait 1 second(s) -- pause
+[23:32:04] *** Starting cycle for row 1, column 1 ***
+[23:32:08] Calculated x position -42733 and y position 42733
+[23:32:11] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[23:32:14] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[23:32:17] Click at (2312, 742) -- center
+[23:32:21] Click at (1417, 466) -- execute global alignment
+[23:32:24] Double click at (1393, 868) -- click X
+[23:32:26] Send keys -42733 -- xval
+[23:32:27] Double click at (1454, 883) -- y
+[23:32:31] Send keys 42733 -- yval
+[23:32:33] Click at (1707, 936) -- move absolute
+[23:32:44] Wait 2 second(s) -- wait for move abs
+[23:32:47] Click at (2262, 869) -- focus
+[23:32:51] Wait 240 second(s) for focus to complete
+[23:36:53] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[23:36:56] Click at (1344, 467) -- alignments tab
+[23:36:59] Click at (2156, 538) -- execute
+[23:37:01] Wait 1 second(s) -- align modal
+[23:37:03] Click at (1953, 796) -- really execute find center
+[23:37:05] Wait 60 second(s) -- wait for alignment
+[23:38:06] Click at (1294, 464) -- job tab
+[23:38:09] Click at (1529, 484) -- start job button
+[23:38:11] Wait 3 second(s) -- wait for laser confirm popup
+[23:38:16] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[23:38:18] Click at (1914, 797) -- START WRITING
+[23:38:19] Wait 780 second(s) -- The actual write job running
+[23:49:55] Wait skipped by operator (1:25 remaining)
+[23:49:55] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[23:49:59] Click at (1970, 797) -- Job done OK
+[23:50:02] Wait 1 second(s) -- pause
+[23:50:04] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[23:50:05] Press space bar to hopefully clear job complete modal
+[23:50:06] Wait 1 second(s) -- pause
+[23:50:08] *** Starting cycle for row 2, column 1 ***
+[23:50:33] Running continuously -- step mode off
+[23:50:33] Calculated x position -42733 and y position 14244
+[23:50:33] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[23:50:34] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[23:50:34] Click at (2312, 742) -- center
+[23:50:37] Click at (1417, 466) -- execute global alignment
+[23:50:39] Double click at (1393, 868) -- click X
+[23:50:40] Send keys -42733 -- xval
+[23:50:40] Double click at (1454, 883) -- y
+[23:50:41] Send keys 14244 -- yval
+[23:50:41] Click at (1707, 936) -- move absolute
+[23:50:42] Wait 2 second(s) -- wait for move abs
+[23:50:44] Click at (2262, 869) -- focus
+[23:50:45] Wait 240 second(s) for focus to complete
+[23:53:24] Wait skipped by operator (1:22 remaining)
+[23:53:24] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[23:53:24] Click at (1344, 467) -- alignments tab
+[23:53:25] Click at (2156, 538) -- execute
+[23:53:26] Wait 1 second(s) -- align modal
+[23:53:27] Click at (1953, 796) -- really execute find center
+[23:53:28] Wait 60 second(s) -- wait for alignment
+[23:54:28] Click at (1294, 464) -- job tab
+[23:54:29] Click at (1529, 484) -- start job button
+[23:54:30] Wait 3 second(s) -- wait for laser confirm popup
+[23:54:33] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[23:54:34] Click at (1914, 797) -- START WRITING
+[23:54:35] Wait 780 second(s) -- The actual write job running
+[00:07:35] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[00:07:36] Click at (1970, 797) -- Job done OK
+[00:07:37] Wait 1 second(s) -- pause
+[00:07:38] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[00:07:38] Press space bar to hopefully clear job complete modal
+[00:07:38] Wait 1 second(s) -- pause
+[00:07:39] *** Starting cycle for row 3, column 1 ***
+[00:07:39] Calculated x position -42733 and y position -14244
+[00:07:39] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[00:07:39] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[00:07:40] Click at (2312, 742) -- center
+[00:07:43] Click at (1417, 466) -- execute global alignment
+[00:07:45] Double click at (1393, 868) -- click X
+[00:07:46] Send keys -42733 -- xval
+[00:07:46] Double click at (1454, 883) -- y
+[00:07:47] Send keys -14244 -- yval
+[00:07:47] Click at (1707, 936) -- move absolute
+[00:07:48] Wait 2 second(s) -- wait for move abs
+[00:07:50] Click at (2262, 869) -- focus
+[00:07:51] Wait 240 second(s) for focus to complete
+[00:11:52] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[00:11:52] Click at (1344, 467) -- alignments tab
+[00:11:53] Click at (2156, 538) -- execute
+[00:11:54] Wait 1 second(s) -- align modal
+[00:11:55] Click at (1953, 796) -- really execute find center
+[00:11:56] Wait 60 second(s) -- wait for alignment
+[00:12:56] Click at (1294, 464) -- job tab
+[00:12:57] Click at (1529, 484) -- start job button
+[00:12:58] Wait 3 second(s) -- wait for laser confirm popup
+[00:13:01] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[00:13:02] Click at (1914, 797) -- START WRITING
+[00:13:03] Wait 780 second(s) -- The actual write job running
+[00:26:03] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[00:26:03] Click at (1970, 797) -- Job done OK
+[00:26:04] Wait 1 second(s) -- pause
+[00:26:05] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[00:26:06] Press space bar to hopefully clear job complete modal
+[00:26:06] Wait 1 second(s) -- pause
+[00:26:07] *** Starting cycle for row 4, column 1 ***
+[00:26:07] Calculated x position -42733 and y position -42733
+[00:26:07] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[00:26:07] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[00:26:07] Click at (2312, 742) -- center
+[00:26:10] Click at (1417, 466) -- execute global alignment
+[00:26:12] Double click at (1393, 868) -- click X
+[00:26:13] Send keys -42733 -- xval
+[00:26:14] Double click at (1454, 883) -- y
+[00:26:15] Send keys -42733 -- yval
+[00:26:15] Click at (1707, 936) -- move absolute
+[00:26:16] Wait 2 second(s) -- wait for move abs
+[00:26:18] Click at (2262, 869) -- focus
+[00:26:19] Wait 240 second(s) for focus to complete
+[00:30:19] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[00:30:20] Click at (1344, 467) -- alignments tab
+[00:30:21] Click at (2156, 538) -- execute
+[00:30:22] Wait 1 second(s) -- align modal
+[00:30:23] Click at (1953, 796) -- really execute find center
+[00:30:24] Wait 60 second(s) -- wait for alignment
+[00:31:24] Click at (1294, 464) -- job tab
+[00:31:25] Click at (1529, 484) -- start job button
+[00:31:26] Wait 3 second(s) -- wait for laser confirm popup
+[00:31:29] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[00:31:29] Click at (1914, 797) -- START WRITING
+[00:31:30] Wait 780 second(s) -- The actual write job running
+[00:44:30] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[00:44:31] Click at (1970, 797) -- Job done OK
+[00:44:32] Wait 1 second(s) -- pause
+[00:44:33] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[00:44:33] Press space bar to hopefully clear job complete modal
+[00:44:33] Wait 1 second(s) -- pause
+[00:44:34] *** Starting cycle for row 0, column 2 ***
+[00:44:34] Calculated x position -14244 and y position 71222
+[00:44:34] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[00:44:35] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[00:44:35] Click at (2312, 742) -- center
+[00:44:38] Click at (1417, 466) -- execute global alignment
+[00:44:40] Double click at (1393, 868) -- click X
+[00:44:41] Send keys -14244 -- xval
+[00:44:41] Double click at (1454, 883) -- y
+[00:44:42] Send keys 71222 -- yval
+[00:44:42] Click at (1707, 936) -- move absolute
+[00:44:43] Wait 2 second(s) -- wait for move abs
+[00:44:45] Click at (2262, 869) -- focus
+[00:44:46] Wait 240 second(s) for focus to complete
+[00:45:39] Script aborted by operator during wait
+===== 2026-08-12 00:48:25 -- log opened by real-dwl.py =====
+[00:48:25] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[00:48:25] Connecting to the browser
+[00:48:25] Click settle time set to 1s
+[00:48:25] Step mode on -- pausing at every step
+[00:48:25] *** Starting cycle for row 0, column 2 ***
+[00:48:32] Running continuously -- step mode off
+[00:48:32] Calculated x position -14244 and y position 71222
+[00:48:32] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[00:48:33] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+*** ALARM: Screen does not match checkz  (similarity 0.7870, needs at least 0.99)
+*** Alarm answered: Stop the script
+[00:48:38] Script stopped by operator
+===== 2026-08-12 00:49:19 -- log opened by real-dwl.py =====
+[00:49:19] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[00:49:19] Connecting to the browser
+[00:49:20] Click settle time set to 1s
+[00:49:20] Step mode on -- pausing at every step
+[00:49:20] *** Starting cycle for row 0, column 2 ***
+[00:49:25] Running continuously -- step mode off
+[00:49:25] Calculated x position -14244 and y position 71222
+[00:49:25] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[00:49:26] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[00:49:26] Click at (2312, 742) -- center
+[00:49:29] Click at (1417, 466) -- execute global alignment
+[00:49:31] Double click at (1393, 868) -- click X
+[00:49:32] Send keys -14244 -- xval
+[00:49:33] Double click at (1454, 883) -- y
+[00:49:34] Send keys 71222 -- yval
+[00:49:34] Click at (1707, 936) -- move absolute
+[00:49:35] Wait 2 second(s) -- wait for move abs
+[00:49:37] Click at (2262, 869) -- focus
+[00:49:38] Wait 240 second(s) for focus to complete
+[00:53:38] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[00:53:38] Click at (1344, 467) -- alignments tab
+[00:53:39] Click at (2156, 538) -- execute
+[00:53:40] Wait 1 second(s) -- align modal
+[00:53:41] Click at (1953, 796) -- really execute find center
+[00:53:42] Wait 60 second(s) -- wait for alignment
+[00:54:43] Click at (1294, 464) -- job tab
+[00:54:44] Click at (1529, 484) -- start job button
+[00:54:45] Wait 3 second(s) -- wait for laser confirm popup
+[00:54:48] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[00:54:48] Click at (1914, 797) -- START WRITING
+[00:54:49] Wait 780 second(s) -- The actual write job running
+[01:07:49] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[01:07:50] Click at (1970, 797) -- Job done OK
+[01:07:51] Wait 1 second(s) -- pause
+[01:07:52] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[01:07:52] Press space bar to hopefully clear job complete modal
+[01:07:52] Wait 1 second(s) -- pause
+[01:07:53] *** Starting cycle for row 1, column 2 ***
+[01:07:53] Calculated x position -14244 and y position 42733
+[01:07:53] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[01:07:54] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[01:07:54] Click at (2312, 742) -- center
+[01:07:57] Click at (1417, 466) -- execute global alignment
+[01:07:59] Double click at (1393, 868) -- click X
+[01:08:00] Send keys -14244 -- xval
+[01:08:00] Double click at (1454, 883) -- y
+[01:08:01] Send keys 42733 -- yval
+[01:08:01] Click at (1707, 936) -- move absolute
+[01:08:02] Wait 2 second(s) -- wait for move abs
+[01:08:04] Click at (2262, 869) -- focus
+[01:08:05] Wait 240 second(s) for focus to complete
+[01:12:06] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[01:12:06] Click at (1344, 467) -- alignments tab
+[01:12:07] Click at (2156, 538) -- execute
+[01:12:08] Wait 1 second(s) -- align modal
+[01:12:09] Click at (1953, 796) -- really execute find center
+[01:12:10] Wait 60 second(s) -- wait for alignment
+[01:13:10] Click at (1294, 464) -- job tab
+[01:13:11] Click at (1529, 484) -- start job button
+[01:13:12] Wait 3 second(s) -- wait for laser confirm popup
+[01:13:15] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[01:13:15] Click at (1914, 797) -- START WRITING
+[01:13:16] Wait 780 second(s) -- The actual write job running
+[01:26:17] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[01:26:17] Click at (1970, 797) -- Job done OK
+[01:26:18] Wait 1 second(s) -- pause
+[01:26:19] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[01:26:19] Press space bar to hopefully clear job complete modal
+[01:26:20] Wait 1 second(s) -- pause
+[01:26:21] *** Starting cycle for row 2, column 2 ***
+[01:26:21] Calculated x position -14244 and y position 14244
+[01:26:21] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[01:26:21] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[01:26:21] Click at (2312, 742) -- center
+[01:26:24] Click at (1417, 466) -- execute global alignment
+[01:26:26] Double click at (1393, 868) -- click X
+[01:26:27] Send keys -14244 -- xval
+[01:26:28] Double click at (1454, 883) -- y
+[01:26:29] Send keys 14244 -- yval
+[01:26:29] Click at (1707, 936) -- move absolute
+[01:26:30] Wait 2 second(s) -- wait for move abs
+[01:26:32] Click at (2262, 869) -- focus
+[01:26:33] Wait 240 second(s) for focus to complete
+[01:30:33] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[01:30:33] Click at (1344, 467) -- alignments tab
+[01:30:34] Click at (2156, 538) -- execute
+[01:30:35] Wait 1 second(s) -- align modal
+[01:30:36] Click at (1953, 796) -- really execute find center
+[01:30:37] Wait 60 second(s) -- wait for alignment
+[01:31:37] Click at (1294, 464) -- job tab
+[01:31:38] Click at (1529, 484) -- start job button
+[01:31:39] Wait 3 second(s) -- wait for laser confirm popup
+[01:31:42] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[01:31:43] Click at (1914, 797) -- START WRITING
+[01:31:44] Wait 780 second(s) -- The actual write job running
+[01:44:44] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[01:44:44] Click at (1970, 797) -- Job done OK
+[01:44:45] Wait 1 second(s) -- pause
+[01:44:46] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[01:44:47] Press space bar to hopefully clear job complete modal
+[01:44:47] Wait 1 second(s) -- pause
+[01:44:48] *** Starting cycle for row 3, column 2 ***
+[01:44:48] Calculated x position -14244 and y position -14244
+[01:44:48] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[01:44:48] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[01:44:49] Click at (2312, 742) -- center
+[01:44:52] Click at (1417, 466) -- execute global alignment
+[01:44:54] Double click at (1393, 868) -- click X
+[01:44:55] Send keys -14244 -- xval
+[01:44:55] Double click at (1454, 883) -- y
+[01:44:56] Send keys -14244 -- yval
+[01:44:56] Click at (1707, 936) -- move absolute
+[01:44:57] Wait 2 second(s) -- wait for move abs
+[01:44:59] Click at (2262, 869) -- focus
+[01:45:00] Wait 240 second(s) for focus to complete
+[01:49:00] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[01:49:01] Click at (1344, 467) -- alignments tab
+[01:49:02] Click at (2156, 538) -- execute
+[01:49:03] Wait 1 second(s) -- align modal
+[01:49:04] Click at (1953, 796) -- really execute find center
+[01:49:05] Wait 60 second(s) -- wait for alignment
+[01:50:05] Click at (1294, 464) -- job tab
+[01:50:06] Click at (1529, 484) -- start job button
+[01:50:07] Wait 3 second(s) -- wait for laser confirm popup
+[01:50:10] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[01:50:10] Click at (1914, 797) -- START WRITING
+[01:50:11] Wait 780 second(s) -- The actual write job running
+[02:03:12] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[02:03:12] Click at (1970, 797) -- Job done OK
+[02:03:13] Wait 1 second(s) -- pause
+[02:03:14] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[02:03:14] Press space bar to hopefully clear job complete modal
+[02:03:14] Wait 1 second(s) -- pause
+[02:03:15] *** Starting cycle for row 4, column 2 ***
+[02:03:15] Calculated x position -14244 and y position -42733
+[02:03:15] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[02:03:16] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[02:03:16] Click at (2312, 742) -- center
+[02:03:19] Click at (1417, 466) -- execute global alignment
+[02:03:21] Double click at (1393, 868) -- click X
+[02:03:22] Send keys -14244 -- xval
+[02:03:22] Double click at (1454, 883) -- y
+[02:03:23] Send keys -42733 -- yval
+[02:03:24] Click at (1707, 936) -- move absolute
+[02:03:25] Wait 2 second(s) -- wait for move abs
+[02:03:27] Click at (2262, 869) -- focus
+[02:03:28] Wait 240 second(s) for focus to complete
+[02:07:28] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[02:07:28] Click at (1344, 467) -- alignments tab
+[02:07:29] Click at (2156, 538) -- execute
+[02:07:30] Wait 1 second(s) -- align modal
+[02:07:31] Click at (1953, 796) -- really execute find center
+[02:07:32] Wait 60 second(s) -- wait for alignment
+[02:08:32] Click at (1294, 464) -- job tab
+[02:08:33] Click at (1529, 484) -- start job button
+[02:08:34] Wait 3 second(s) -- wait for laser confirm popup
+[02:08:37] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[02:08:38] Click at (1914, 797) -- START WRITING
+[02:08:39] Wait 780 second(s) -- The actual write job running
+[02:21:39] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[02:21:39] Click at (1970, 797) -- Job done OK
+[02:21:40] Wait 1 second(s) -- pause
+[02:21:41] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[02:21:42] Press space bar to hopefully clear job complete modal
+[02:21:42] Wait 1 second(s) -- pause
+[02:21:43] *** Starting cycle for row 5, column 2 ***
+[02:21:43] Calculated x position -14244 and y position -71222
+[02:21:43] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[02:21:43] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[02:21:44] Click at (2312, 742) -- center
+[02:21:47] Click at (1417, 466) -- execute global alignment
+[02:21:49] Double click at (1393, 868) -- click X
+[02:21:50] Send keys -14244 -- xval
+[02:21:50] Double click at (1454, 883) -- y
+[02:21:51] Send keys -71222 -- yval
+[02:21:51] Click at (1707, 936) -- move absolute
+[02:21:52] Wait 2 second(s) -- wait for move abs
+[02:21:54] Click at (2262, 869) -- focus
+[02:21:55] Wait 240 second(s) for focus to complete
+[02:25:55] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[02:25:56] Click at (1344, 467) -- alignments tab
+[02:25:57] Click at (2156, 538) -- execute
+[02:25:58] Wait 1 second(s) -- align modal
+[02:25:59] Click at (1953, 796) -- really execute find center
+[02:26:00] Wait 60 second(s) -- wait for alignment
+[02:27:00] Click at (1294, 464) -- job tab
+[02:27:01] Click at (1529, 484) -- start job button
+[02:27:02] Wait 3 second(s) -- wait for laser confirm popup
+[02:27:05] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[02:27:05] Click at (1914, 797) -- START WRITING
+[02:27:06] Wait 780 second(s) -- The actual write job running
+[02:40:06] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+*** ALARM: Screen does not match jobdonepop  (similarity 0.4491, needs at least 0.99)
+*** Alarm answered: Stop the script
+[02:46:33] Script stopped by operator
+===== 2026-08-12 02:48:29 -- log opened by real-dwl.py =====
+[02:48:29] Logging to D:\Github\Playwritght-Script\real-dwl.log
+[02:48:29] Connecting to the browser
+[02:48:34] Click settle time set to 1s
+[02:48:34] Step mode on -- pausing at every step
+[02:48:34] *** Starting cycle for row 0, column 3 ***
+[02:48:42] Calculated x position 14244 and y position 71222
+[02:48:43] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[02:48:45] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[02:48:46] Click at (2312, 742) -- center
+[02:48:50] Click at (1417, 466) -- execute global alignment
+[02:49:02] Double click at (1393, 868) -- click X
+[02:49:04] Send keys 14244 -- xval
+[02:49:05] Double click at (1454, 883) -- y
+[02:49:07] Send keys 71222 -- yval
+[02:49:08] Click at (1707, 936) -- move absolute
+[02:49:09] Running continuously -- step mode off
+[02:49:10] Wait 2 second(s) -- wait for move abs
+[02:49:12] Click at (2262, 869) -- focus
+[02:49:13] Wait 240 second(s) for focus to complete
+[02:53:13] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[02:53:14] Click at (1344, 467) -- alignments tab
+[02:53:15] Click at (2156, 538) -- execute
+[02:53:16] Wait 1 second(s) -- align modal
+[02:53:17] Click at (1953, 796) -- really execute find center
+[02:53:18] Wait 90 second(s) -- wait for alignment
+[02:54:48] Click at (1294, 464) -- job tab
+[02:54:49] Click at (1529, 484) -- start job button
+[02:54:50] Wait 3 second(s) -- wait for laser confirm popup
+[02:54:53] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[02:54:53] Click at (1914, 797) -- START WRITING
+[02:54:54] Wait 780 second(s) -- The actual write job running
+[03:07:54] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[03:07:55] Click at (1970, 797) -- Job done OK
+[03:07:56] Wait 1 second(s) -- pause
+[03:07:57] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[03:07:57] Press space bar to hopefully clear job complete modal
+[03:07:57] Wait 1 second(s) -- pause
+[03:07:58] *** Starting cycle for row 1, column 3 ***
+[03:07:58] Calculated x position 14244 and y position 42733
+[03:07:58] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[03:07:59] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[03:07:59] Click at (2312, 742) -- center
+[03:08:02] Click at (1417, 466) -- execute global alignment
+[03:08:04] Double click at (1393, 868) -- click X
+[03:08:05] Send keys 14244 -- xval
+[03:08:05] Double click at (1454, 883) -- y
+[03:08:06] Send keys 42733 -- yval
+[03:08:06] Click at (1707, 936) -- move absolute
+[03:08:07] Wait 2 second(s) -- wait for move abs
+[03:08:09] Click at (2262, 869) -- focus
+[03:08:10] Wait 240 second(s) for focus to complete
+[03:12:11] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[03:12:11] Click at (1344, 467) -- alignments tab
+[03:12:12] Click at (2156, 538) -- execute
+[03:12:13] Wait 1 second(s) -- align modal
+[03:12:14] Click at (1953, 796) -- really execute find center
+[03:12:15] Wait 90 second(s) -- wait for alignment
+[03:13:45] Click at (1294, 464) -- job tab
+[03:13:46] Click at (1529, 484) -- start job button
+[03:13:47] Wait 3 second(s) -- wait for laser confirm popup
+[03:13:50] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[03:13:51] Click at (1914, 797) -- START WRITING
+[03:13:52] Wait 780 second(s) -- The actual write job running
+[03:26:52] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[03:26:52] Click at (1970, 797) -- Job done OK
+[03:26:53] Wait 1 second(s) -- pause
+[03:26:54] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[03:26:55] Press space bar to hopefully clear job complete modal
+[03:26:55] Wait 1 second(s) -- pause
+[03:26:56] *** Starting cycle for row 2, column 3 ***
+[03:26:56] Calculated x position 14244 and y position 14244
+[03:26:56] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[03:26:56] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[03:26:56] Click at (2312, 742) -- center
+[03:26:59] Click at (1417, 466) -- execute global alignment
+[03:27:01] Double click at (1393, 868) -- click X
+[03:27:03] Send keys 14244 -- xval
+[03:27:03] Double click at (1454, 883) -- y
+[03:27:04] Send keys 14244 -- yval
+[03:27:04] Click at (1707, 936) -- move absolute
+[03:27:05] Wait 2 second(s) -- wait for move abs
+[03:27:07] Click at (2262, 869) -- focus
+[03:27:08] Wait 240 second(s) for focus to complete
+[03:31:08] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[03:31:09] Click at (1344, 467) -- alignments tab
+[03:31:10] Click at (2156, 538) -- execute
+[03:31:11] Wait 1 second(s) -- align modal
+[03:31:12] Click at (1953, 796) -- really execute find center
+[03:31:13] Wait 90 second(s) -- wait for alignment
+[03:32:43] Click at (1294, 464) -- job tab
+[03:32:44] Click at (1529, 484) -- start job button
+[03:32:45] Wait 3 second(s) -- wait for laser confirm popup
+[03:32:48] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[03:32:48] Click at (1914, 797) -- START WRITING
+[03:32:49] Wait 780 second(s) -- The actual write job running
+[03:45:49] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[03:45:50] Click at (1970, 797) -- Job done OK
+[03:45:51] Wait 1 second(s) -- pause
+[03:45:52] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[03:45:52] Press space bar to hopefully clear job complete modal
+[03:45:52] Wait 1 second(s) -- pause
+[03:45:53] *** Starting cycle for row 3, column 3 ***
+[03:45:53] Calculated x position 14244 and y position -14244
+[03:45:53] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[03:45:54] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[03:45:54] Click at (2312, 742) -- center
+[03:45:57] Click at (1417, 466) -- execute global alignment
+[03:45:59] Double click at (1393, 868) -- click X
+[03:46:00] Send keys 14244 -- xval
+[03:46:00] Double click at (1454, 883) -- y
+[03:46:01] Send keys -14244 -- yval
+[03:46:01] Click at (1707, 936) -- move absolute
+[03:46:02] Wait 2 second(s) -- wait for move abs
+[03:46:04] Click at (2262, 869) -- focus
+[03:46:05] Wait 240 second(s) for focus to complete
+[03:50:06] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[03:50:06] Click at (1344, 467) -- alignments tab
+[03:50:07] Click at (2156, 538) -- execute
+[03:50:08] Wait 1 second(s) -- align modal
+[03:50:09] Click at (1953, 796) -- really execute find center
+[03:50:10] Wait 90 second(s) -- wait for alignment
+[03:51:40] Click at (1294, 464) -- job tab
+[03:51:41] Click at (1529, 484) -- start job button
+[03:51:42] Wait 3 second(s) -- wait for laser confirm popup
+[03:51:45] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[03:51:46] Click at (1914, 797) -- START WRITING
+[03:51:47] Wait 780 second(s) -- The actual write job running
+[04:04:47] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[04:04:47] Click at (1970, 797) -- Job done OK
+[04:04:48] Wait 1 second(s) -- pause
+[04:04:49] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[04:04:49] Press space bar to hopefully clear job complete modal
+[04:04:50] Wait 1 second(s) -- pause
+[04:04:51] *** Starting cycle for row 4, column 3 ***
+[04:04:51] Calculated x position 14244 and y position -42733
+[04:04:51] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[04:04:51] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[04:04:51] Click at (2312, 742) -- center
+[04:04:54] Click at (1417, 466) -- execute global alignment
+[04:04:56] Double click at (1393, 868) -- click X
+[04:04:57] Send keys 14244 -- xval
+[04:04:58] Double click at (1454, 883) -- y
+[04:04:59] Send keys -42733 -- yval
+[04:04:59] Click at (1707, 936) -- move absolute
+[04:05:00] Wait 2 second(s) -- wait for move abs
+[04:05:02] Click at (2262, 869) -- focus
+[04:05:03] Wait 240 second(s) for focus to complete
+[04:09:03] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[04:09:03] Click at (1344, 467) -- alignments tab
+[04:09:04] Click at (2156, 538) -- execute
+[04:09:05] Wait 1 second(s) -- align modal
+[04:09:06] Click at (1953, 796) -- really execute find center
+[04:09:07] Wait 90 second(s) -- wait for alignment
+[04:10:37] Click at (1294, 464) -- job tab
+[04:10:38] Click at (1529, 484) -- start job button
+[04:10:39] Wait 3 second(s) -- wait for laser confirm popup
+[04:10:42] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[04:10:43] Click at (1914, 797) -- START WRITING
+[04:10:44] Wait 780 second(s) -- The actual write job running
+[04:23:44] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[04:23:44] Click at (1970, 797) -- Job done OK
+[04:23:45] Wait 1 second(s) -- pause
+[04:23:46] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[04:23:47] Press space bar to hopefully clear job complete modal
+[04:23:47] Wait 1 second(s) -- pause
+[04:23:48] *** Starting cycle for row 5, column 3 ***
+[04:23:48] Calculated x position 14244 and y position -71222
+[04:23:48] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[04:23:48] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[04:23:48] Click at (2312, 742) -- center
+[04:23:51] Click at (1417, 466) -- execute global alignment
+[04:23:53] Double click at (1393, 868) -- click X
+[04:23:54] Send keys 14244 -- xval
+[04:23:55] Double click at (1454, 883) -- y
+[04:23:56] Send keys -71222 -- yval
+[04:23:56] Click at (1707, 936) -- move absolute
+[04:23:57] Wait 2 second(s) -- wait for move abs
+[04:23:59] Click at (2262, 869) -- focus
+[04:24:00] Wait 240 second(s) for focus to complete
+[04:28:00] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[04:28:01] Click at (1344, 467) -- alignments tab
+[04:28:02] Click at (2156, 538) -- execute
+[04:28:03] Wait 1 second(s) -- align modal
+[04:28:04] Click at (1953, 796) -- really execute find center
+[04:28:05] Wait 90 second(s) -- wait for alignment
+[04:29:35] Click at (1294, 464) -- job tab
+[04:29:36] Click at (1529, 484) -- start job button
+[04:29:37] Wait 3 second(s) -- wait for laser confirm popup
+[04:29:40] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[04:29:40] Click at (1914, 797) -- START WRITING
+[04:29:41] Wait 780 second(s) -- The actual write job running
+[04:42:41] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[04:42:42] Click at (1970, 797) -- Job done OK
+[04:42:43] Wait 1 second(s) -- pause
+[04:42:44] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[04:42:44] Press space bar to hopefully clear job complete modal
+[04:42:44] Wait 1 second(s) -- pause
+[04:42:45] *** Starting cycle for row 0, column 4 ***
+[04:42:45] Calculated x position 42733 and y position 71222
+[04:42:45] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[04:42:46] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[04:42:46] Click at (2312, 742) -- center
+[04:42:49] Click at (1417, 466) -- execute global alignment
+[04:42:51] Double click at (1393, 868) -- click X
+[04:42:52] Send keys 42733 -- xval
+[04:42:52] Double click at (1454, 883) -- y
+[04:42:53] Send keys 71222 -- yval
+[04:42:53] Click at (1707, 936) -- move absolute
+[04:42:54] Wait 2 second(s) -- wait for move abs
+[04:42:56] Click at (2262, 869) -- focus
+[04:42:57] Wait 240 second(s) for focus to complete
+[04:46:58] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[04:46:58] Click at (1344, 467) -- alignments tab
+[04:46:59] Click at (2156, 538) -- execute
+[04:47:00] Wait 1 second(s) -- align modal
+[04:47:01] Click at (1953, 796) -- really execute find center
+[04:47:02] Wait 90 second(s) -- wait for alignment
+[04:48:32] Click at (1294, 464) -- job tab
+[04:48:33] Click at (1529, 484) -- start job button
+[04:48:34] Wait 3 second(s) -- wait for laser confirm popup
+[04:48:37] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[04:48:38] Click at (1914, 797) -- START WRITING
+[04:48:39] Wait 780 second(s) -- The actual write job running
+[05:01:39] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[05:01:39] Click at (1970, 797) -- Job done OK
+[05:01:40] Wait 1 second(s) -- pause
+[05:01:41] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[05:01:42] Press space bar to hopefully clear job complete modal
+[05:01:42] Wait 1 second(s) -- pause
+[05:01:43] *** Starting cycle for row 1, column 4 ***
+[05:01:43] Calculated x position 42733 and y position 42733
+[05:01:43] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[05:01:43] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[05:01:43] Click at (2312, 742) -- center
+[05:01:46] Click at (1417, 466) -- execute global alignment
+[05:01:49] Double click at (1393, 868) -- click X
+[05:01:50] Send keys 42733 -- xval
+[05:01:50] Double click at (1454, 883) -- y
+[05:01:51] Send keys 42733 -- yval
+[05:01:51] Click at (1707, 936) -- move absolute
+[05:01:52] Wait 2 second(s) -- wait for move abs
+[05:01:54] Click at (2262, 869) -- focus
+[05:01:55] Wait 240 second(s) for focus to complete
+[05:05:55] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[05:05:55] Click at (1344, 467) -- alignments tab
+[05:05:56] Click at (2156, 538) -- execute
+[05:05:57] Wait 1 second(s) -- align modal
+[05:05:58] Click at (1953, 796) -- really execute find center
+[05:05:59] Wait 90 second(s) -- wait for alignment
+[05:07:30] Click at (1294, 464) -- job tab
+[05:07:31] Click at (1529, 484) -- start job button
+[05:07:32] Wait 3 second(s) -- wait for laser confirm popup
+[05:07:35] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[05:07:35] Click at (1914, 797) -- START WRITING
+[05:07:36] Wait 780 second(s) -- The actual write job running
+[05:20:36] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[05:20:37] Click at (1970, 797) -- Job done OK
+[05:20:38] Wait 1 second(s) -- pause
+[05:20:39] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[05:20:39] Press space bar to hopefully clear job complete modal
+[05:20:39] Wait 1 second(s) -- pause
+[05:20:40] *** Starting cycle for row 2, column 4 ***
+[05:20:40] Calculated x position 42733 and y position 14244
+[05:20:40] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[05:20:40] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[05:20:41] Click at (2312, 742) -- center
+[05:20:44] Click at (1417, 466) -- execute global alignment
+[05:20:46] Double click at (1393, 868) -- click X
+[05:20:47] Send keys 42733 -- xval
+[05:20:47] Double click at (1454, 883) -- y
+[05:20:48] Send keys 14244 -- yval
+[05:20:48] Click at (1707, 936) -- move absolute
+[05:20:49] Wait 2 second(s) -- wait for move abs
+[05:20:51] Click at (2262, 869) -- focus
+[05:20:52] Wait 240 second(s) for focus to complete
+[05:24:52] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[05:24:53] Click at (1344, 467) -- alignments tab
+[05:24:54] Click at (2156, 538) -- execute
+[05:24:55] Wait 1 second(s) -- align modal
+[05:24:56] Click at (1953, 796) -- really execute find center
+[05:24:57] Wait 90 second(s) -- wait for alignment
+[05:26:27] Click at (1294, 464) -- job tab
+[05:26:28] Click at (1529, 484) -- start job button
+[05:26:29] Wait 3 second(s) -- wait for laser confirm popup
+[05:26:32] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[05:26:33] Click at (1914, 797) -- START WRITING
+[05:26:34] Wait 780 second(s) -- The actual write job running
+[05:39:34] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[05:39:34] Click at (1970, 797) -- Job done OK
+[05:39:35] Wait 1 second(s) -- pause
+[05:39:36] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[05:39:36] Press space bar to hopefully clear job complete modal
+[05:39:37] Wait 1 second(s) -- pause
+[05:39:38] *** Starting cycle for row 3, column 4 ***
+[05:39:38] Calculated x position 42733 and y position -14244
+[05:39:38] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[05:39:38] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[05:39:38] Click at (2312, 742) -- center
+[05:39:41] Click at (1417, 466) -- execute global alignment
+[05:39:43] Double click at (1393, 868) -- click X
+[05:39:44] Send keys 42733 -- xval
+[05:39:45] Double click at (1454, 883) -- y
+[05:39:46] Send keys -14244 -- yval
+[05:39:46] Click at (1707, 936) -- move absolute
+[05:39:47] Wait 2 second(s) -- wait for move abs
+[05:39:49] Click at (2262, 869) -- focus
+[05:39:50] Wait 240 second(s) for focus to complete
+[05:43:50] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[05:43:50] Click at (1344, 467) -- alignments tab
+[05:43:51] Click at (2156, 538) -- execute
+[05:43:52] Wait 1 second(s) -- align modal
+[05:43:53] Click at (1953, 796) -- really execute find center
+[05:43:54] Wait 90 second(s) -- wait for alignment
+[05:45:25] Click at (1294, 464) -- job tab
+[05:45:26] Click at (1529, 484) -- start job button
+[05:45:27] Wait 3 second(s) -- wait for laser confirm popup
+[05:45:30] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[05:45:30] Click at (1914, 797) -- START WRITING
+[05:45:31] Wait 780 second(s) -- The actual write job running
+[05:58:31] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[05:58:32] Click at (1970, 797) -- Job done OK
+[05:58:33] Wait 1 second(s) -- pause
+[05:58:34] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[05:58:34] Press space bar to hopefully clear job complete modal
+[05:58:34] Wait 1 second(s) -- pause
+[05:58:35] *** Starting cycle for row 4, column 4 ***
+[05:58:35] Calculated x position 42733 and y position -42733
+[05:58:35] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[05:58:35] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[05:58:36] Click at (2312, 742) -- center
+[05:58:39] Click at (1417, 466) -- execute global alignment
+[05:58:41] Double click at (1393, 868) -- click X
+[05:58:42] Send keys 42733 -- xval
+[05:58:42] Double click at (1454, 883) -- y
+[05:58:43] Send keys -42733 -- yval
+[05:58:43] Click at (1707, 936) -- move absolute
+[05:58:44] Wait 2 second(s) -- wait for move abs
+[05:58:46] Click at (2262, 869) -- focus
+[05:58:47] Wait 240 second(s) for focus to complete
+[06:02:47] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[06:02:48] Click at (1344, 467) -- alignments tab
+[06:02:49] Click at (2156, 538) -- execute
+[06:02:50] Wait 1 second(s) -- align modal
+[06:02:51] Click at (1953, 796) -- really execute find center
+[06:02:52] Wait 90 second(s) -- wait for alignment
+[06:04:22] Click at (1294, 464) -- job tab
+[06:04:23] Click at (1529, 484) -- start job button
+[06:04:24] Wait 3 second(s) -- wait for laser confirm popup
+[06:04:27] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[06:04:27] Click at (1914, 797) -- START WRITING
+[06:04:28] Wait 780 second(s) -- The actual write job running
+[06:17:29] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[06:17:29] Click at (1970, 797) -- Job done OK
+[06:17:30] Wait 1 second(s) -- pause
+[06:17:31] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[06:17:31] Press space bar to hopefully clear job complete modal
+[06:17:31] Wait 1 second(s) -- pause
+[06:17:32] *** Starting cycle for row 5, column 4 ***
+[06:17:32] Calculated x position 42733 and y position -71222
+[06:17:32] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[06:17:33] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[06:17:33] Click at (2312, 742) -- center
+[06:17:36] Click at (1417, 466) -- execute global alignment
+[06:17:38] Double click at (1393, 868) -- click X
+[06:17:39] Send keys 42733 -- xval
+[06:17:39] Double click at (1454, 883) -- y
+[06:17:40] Send keys -71222 -- yval
+[06:17:41] Click at (1707, 936) -- move absolute
+[06:17:42] Wait 2 second(s) -- wait for move abs
+[06:17:44] Click at (2262, 869) -- focus
+[06:17:45] Wait 240 second(s) for focus to complete
+[06:21:45] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[06:21:45] Click at (1344, 467) -- alignments tab
+[06:21:46] Click at (2156, 538) -- execute
+[06:21:47] Wait 1 second(s) -- align modal
+[06:21:48] Click at (1953, 796) -- really execute find center
+[06:21:49] Wait 90 second(s) -- wait for alignment
+[06:23:19] Click at (1294, 464) -- job tab
+[06:23:20] Click at (1529, 484) -- start job button
+[06:23:21] Wait 3 second(s) -- wait for laser confirm popup
+[06:23:24] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[06:23:25] Click at (1914, 797) -- START WRITING
+[06:23:26] Wait 780 second(s) -- The actual write job running
+[06:36:26] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[06:36:26] Click at (1970, 797) -- Job done OK
+[06:36:27] Wait 1 second(s) -- pause
+[06:36:28] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[06:36:29] Press space bar to hopefully clear job complete modal
+[06:36:29] Wait 1 second(s) -- pause
+[06:36:30] *** Starting cycle for row 0, column 5 ***
+[06:36:30] Calculated x position 71222 and y position 71222
+[06:36:30] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[06:36:30] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[06:36:31] Click at (2312, 742) -- center
+[06:36:34] Click at (1417, 466) -- execute global alignment
+[06:36:36] Double click at (1393, 868) -- click X
+[06:36:37] Send keys 71222 -- xval
+[06:36:37] Double click at (1454, 883) -- y
+[06:36:38] Send keys 71222 -- yval
+[06:36:38] Click at (1707, 936) -- move absolute
+[06:36:39] Wait 2 second(s) -- wait for move abs
+[06:36:41] Click at (2262, 869) -- focus
+[06:36:42] Wait 240 second(s) for focus to complete
+[06:40:42] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[06:40:43] Click at (1344, 467) -- alignments tab
+[06:40:44] Click at (2156, 538) -- execute
+[06:40:45] Wait 1 second(s) -- align modal
+[06:40:46] Click at (1953, 796) -- really execute find center
+[06:40:47] Wait 90 second(s) -- wait for alignment
+[06:42:17] Click at (1294, 464) -- job tab
+[06:42:18] Click at (1529, 484) -- start job button
+[06:42:19] Wait 3 second(s) -- wait for laser confirm popup
+[06:42:22] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[06:42:22] Click at (1914, 797) -- START WRITING
+[06:42:23] Wait 780 second(s) -- The actual write job running
+[06:55:23] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[06:55:24] Click at (1970, 797) -- Job done OK
+[06:55:25] Wait 1 second(s) -- pause
+[06:55:26] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[06:55:26] Press space bar to hopefully clear job complete modal
+[06:55:26] Wait 1 second(s) -- pause
+[06:55:27] *** Starting cycle for row 1, column 5 ***
+[06:55:27] Calculated x position 71222 and y position 42733
+[06:55:27] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[06:55:27] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[06:55:28] Click at (2312, 742) -- center
+[06:55:31] Click at (1417, 466) -- execute global alignment
+[06:55:33] Double click at (1393, 868) -- click X
+[06:55:34] Send keys 71222 -- xval
+[06:55:34] Double click at (1454, 883) -- y
+[06:55:35] Send keys 42733 -- yval
+[06:55:35] Click at (1707, 936) -- move absolute
+[06:55:36] Wait 2 second(s) -- wait for move abs
+[06:55:38] Click at (2262, 869) -- focus
+[06:55:39] Wait 240 second(s) for focus to complete
+[06:59:39] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[06:59:40] Click at (1344, 467) -- alignments tab
+[06:59:41] Click at (2156, 538) -- execute
+[06:59:42] Wait 1 second(s) -- align modal
+[06:59:43] Click at (1953, 796) -- really execute find center
+[06:59:44] Wait 90 second(s) -- wait for alignment
+[07:01:14] Click at (1294, 464) -- job tab
+[07:01:15] Click at (1529, 484) -- start job button
+[07:01:16] Wait 3 second(s) -- wait for laser confirm popup
+[07:01:19] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[07:01:19] Click at (1914, 797) -- START WRITING
+[07:01:20] Wait 780 second(s) -- The actual write job running
+[07:14:20] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[07:14:21] Click at (1970, 797) -- Job done OK
+[07:14:22] Wait 1 second(s) -- pause
+[07:14:23] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[07:14:23] Press space bar to hopefully clear job complete modal
+[07:14:23] Wait 1 second(s) -- pause
+[07:14:24] *** Starting cycle for row 2, column 5 ***
+[07:14:24] Calculated x position 71222 and y position 14244
+[07:14:24] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[07:14:25] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[07:14:25] Click at (2312, 742) -- center
+[07:14:28] Click at (1417, 466) -- execute global alignment
+[07:14:30] Double click at (1393, 868) -- click X
+[07:14:31] Send keys 71222 -- xval
+[07:14:31] Double click at (1454, 883) -- y
+[07:14:32] Send keys 14244 -- yval
+[07:14:33] Click at (1707, 936) -- move absolute
+[07:14:34] Wait 2 second(s) -- wait for move abs
+[07:14:36] Click at (2262, 869) -- focus
+[07:14:37] Wait 240 second(s) for focus to complete
+[07:18:37] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[07:18:37] Click at (1344, 467) -- alignments tab
+[07:18:38] Click at (2156, 538) -- execute
+[07:18:39] Wait 1 second(s) -- align modal
+[07:18:40] Click at (1953, 796) -- really execute find center
+[07:18:41] Wait 90 second(s) -- wait for alignment
+[07:20:11] Click at (1294, 464) -- job tab
+[07:20:12] Click at (1529, 484) -- start job button
+[07:20:13] Wait 3 second(s) -- wait for laser confirm popup
+[07:20:16] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[07:20:17] Click at (1914, 797) -- START WRITING
+[07:20:18] Wait 780 second(s) -- The actual write job running
+[07:33:18] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[07:33:18] Click at (1970, 797) -- Job done OK
+[07:33:19] Wait 1 second(s) -- pause
+[07:33:20] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[07:33:21] Press space bar to hopefully clear job complete modal
+[07:33:21] Wait 1 second(s) -- pause
+[07:33:22] *** Starting cycle for row 3, column 5 ***
+[07:33:22] Calculated x position 71222 and y position -14244
+[07:33:22] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[07:33:22] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[07:33:23] Click at (2312, 742) -- center
+[07:33:26] Click at (1417, 466) -- execute global alignment
+[07:33:28] Double click at (1393, 868) -- click X
+[07:33:29] Send keys 71222 -- xval
+[07:33:29] Double click at (1454, 883) -- y
+[07:33:30] Send keys -14244 -- yval
+[07:33:30] Click at (1707, 936) -- move absolute
+[07:33:31] Wait 2 second(s) -- wait for move abs
+[07:33:33] Click at (2262, 869) -- focus
+[07:33:34] Wait 240 second(s) for focus to complete
+[07:37:34] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[07:37:35] Click at (1344, 467) -- alignments tab
+[07:37:36] Click at (2156, 538) -- execute
+[07:37:37] Wait 1 second(s) -- align modal
+[07:37:38] Click at (1953, 796) -- really execute find center
+[07:37:39] Wait 90 second(s) -- wait for alignment
+[07:39:09] Click at (1294, 464) -- job tab
+[07:39:10] Click at (1529, 484) -- start job button
+[07:39:11] Wait 3 second(s) -- wait for laser confirm popup
+[07:39:14] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[07:39:14] Click at (1914, 797) -- START WRITING
+[07:39:15] Wait 780 second(s) -- The actual write job running
+[07:52:16] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+[07:52:16] Click at (1970, 797) -- Job done OK
+[07:52:17] Wait 1 second(s) -- pause
+[07:52:18] Screen test 'stageready' (matchLevel 0.99) -- Check stage ready after write completes
+[07:52:18] Press space bar to hopefully clear job complete modal
+[07:52:18] Wait 1 second(s) -- pause
+[07:52:19] *** Starting cycle for row 4, column 5 ***
+[07:52:19] Calculated x position 71222 and y position -42733
+[07:52:19] Screen test 'cenetrbutton' (matchLevel 0.99) -- Check center button location
+[07:52:20] Screen test check z height is zero 'checkz' (matchLevel 0.99)
+[07:52:20] Click at (2312, 742) -- center
+[07:52:23] Click at (1417, 466) -- execute global alignment
+[07:52:25] Double click at (1393, 868) -- click X
+[07:52:26] Send keys 71222 -- xval
+[07:52:26] Double click at (1454, 883) -- y
+[07:52:27] Send keys -42733 -- yval
+[07:52:28] Click at (1707, 936) -- move absolute
+[07:52:29] Wait 2 second(s) -- wait for move abs
+[07:52:31] Click at (2262, 869) -- focus
+[07:52:32] Wait 240 second(s) for focus to complete
+[07:56:32] Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready
+[07:56:32] Click at (1344, 467) -- alignments tab
+[07:56:33] Click at (2156, 538) -- execute
+[07:56:34] Wait 1 second(s) -- align modal
+[07:56:35] Click at (1953, 796) -- really execute find center
+[07:56:36] Wait 90 second(s) -- wait for alignment
+[07:58:07] Click at (1294, 464) -- job tab
+[07:58:08] Click at (1529, 484) -- start job button
+[07:58:09] Wait 3 second(s) -- wait for laser confirm popup
+[07:58:12] Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box
+[07:58:12] Click at (1914, 797) -- START WRITING
+[07:58:13] Wait 780 second(s) -- The actual write job running
+[08:11:13] Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup
+*** ALARM: Screen does not match jobdonepop  (similarity 0.6113, needs at least 0.99)
+*** Alarm answered: Stop the script
+[08:11:57] Script stopped by operator
