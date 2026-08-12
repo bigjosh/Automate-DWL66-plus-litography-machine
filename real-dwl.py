@@ -19,14 +19,15 @@ psl.pauseOnInfo(True)
 # this is the disnace between the centers of the squares in the grid, in um
 spacing = 28489
 
-for c in range(0, 6):
+# Row 0 is left column if you are looking at the stage from the front, row 5 is right column.
+for r in range(0, 6):
 
-    for r in range(0, 6):
+    for c in range(0, 6):
     
         psl.info(f"*** Starting cycle for row {r}, column {c} ***")
 
-        xpos = str(int((c - 2.5) * spacing))
-        ypos = str(int((r - 2.5) * -spacing))
+        xpos = str(int((r - 2.5) * spacing))
+        ypos = str(int((c - 2.5) * -spacing))
 
         psl.info(f"Calculated x position {xpos} and y position {ypos}")   
 
