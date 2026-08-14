@@ -4,6 +4,7 @@ import sys
 import playwrightscriptlib as psl
 
 psl.logging(True)
+psl.screenshotOnInfo(True)                      # screen before ever info() saved to screenshots/ 
 psl.alarmOnError()
 psl.info('Connecting to the browser')
 psl.connect(sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:9222', page_hint='remotedesktop.google.com')
@@ -19,18 +20,37 @@ psl.pauseOnInfo(True)
 # this is the disnace between the centers of the squares in the grid, in um
 spacing = 28489
 
-# Row 0 is left column if you are looking at the stage from the front, row 5 is right column.
+# Row 0 is the line of disks closest to the machgine door
+# Col 0 is the row of disks closest to the left side of the machine when looking at it from the front
+
+# (row, col) positions to skip
+skiplist = [
+    (0, 0),
+    (0, 1),
+    (0, 2),
+    (0, 3),
+    (0, 4),
+    (0, 5),
+    (1, 0),
+]
+
 for r in range(0, 6):
 
     for c in range(0, 6):
+
+        if (r, c) in skiplist:
+            continue        
     
         psl.info(f"*** Starting cycle for row {r}, column {c} ***")
 
         xpos = str(int((r - 2.5) * spacing))
         ypos = str(int((c - 2.5) * -spacing))
 
-        psl.info(f"Calculated x position {xpos} and y position {ypos}")   
+        psl.info(f"Calculated x position {xpos} and y position {ypos}")  
 
+        # Check z is at 0um
+        psl.info("Screen test 'z0um' (matchLevel 0.999) -- Check z is at 0um")
+        psl.verifyFrame('capture-immediate-z0um-2220,797,2259,810.png', (2220, 797, 2259, 810), 0.999, 'Screen does not match z0um')
 
         # Check center button location
         # This really just checks that the DWL software is running and the window is in the expected place
@@ -72,8 +92,8 @@ for r in range(0, 6):
         psl.click(1707, 936)
 
         # wait for move abs
-        psl.info('Wait 2 second(s) -- wait for move abs')
-        psl.wait(2)
+        psl.info('Wait 5 second(s) -- wait for move abs')
+        psl.wait(5) 
 
         # execute focus
         psl.info('Click at (2262, 869) -- focus')
@@ -96,6 +116,10 @@ for r in range(0, 6):
         psl.info('Click at (1344, 467) -- alignments tab')
         psl.click(1344, 467)
 
+        # check for alingments execute button
+        psl.info("Screen test 'alingexecutebut' (matchLevel 0.999) -- check for alingments execute button")
+        psl.verifyFrame('capture-immediate-alingexecutebut-2121,518,2188,559.png', (2121, 518, 2188, 559), 0.999, 'Screen does not match alingexecutebut')
+
         # execute
         psl.info('Click at (2156, 538) -- execute')
         psl.click(2156, 538)
@@ -110,12 +134,20 @@ for r in range(0, 6):
 
         # wait for alignment
         # this was too close at 60 so increased to 90
-        psl.info('Wait 90 second(s) -- wait for alignment')
-        psl.wait(90)
+        psl.info('Wait 100 second(s) -- wait for alignment')
+        psl.wait(100)
+
+        # check that the Alignment execute button unpoped (it has red dot while executing)
+        psl.info("Screen test 'alignexecutebut' (matchLevel 0.999) -- Alignment execute button")
+        psl.verifyFrame('capture-immediate-alignexecutebut-2130,529,2178,548.png', (2130, 529, 2178, 548), 0.999, 'Screen does not match alignexecutebut')        
 
         # job tab
         psl.info('Click at (1294, 464) -- job tab')
         psl.click(1294, 464)
+
+        # Job Start button
+        psl.info("Screen test 'jobstart' (matchLevel 0.999) -- Job Start button")
+        psl.verifyFrame('capture-immediate-jobstart-1508,474,1550,497.png', (1508, 474, 1550, 497), 0.999, 'Screen does not match jobstart')        
 
         # start job button
         psl.info('Click at (1529, 484) -- start job button')
@@ -127,7 +159,7 @@ for r in range(0, 6):
 
         # check for laser on box
         psl.info("Screen test 'laseronbox' (matchLevel 0.99) -- check for laser on box")
-        psl.verifyFrame('capture-real-dwl-laseronbox-1793,716,2058,808.png', (1793, 716, 2058, 808), 0.99, 'Screen does not match laseronbox')
+        psl.verifyFrame('capture-real-dwl-laseronbox-1793,716,2058,808.png', (1793, 716, 2058, 808), 0.998, 'Screen does not match laseronbox')
 
         # START WRITING
         psl.info('Click at (1914, 797) -- START WRITING')

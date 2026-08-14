@@ -51,6 +51,8 @@ _page = None
 _log = None
 _pause_on_info = False
 _clicks_settle_time = 0.0
+_shot_dir = None
+_shot_warned = False
 
 
 def _log_write(text):
@@ -628,11 +630,61 @@ def info(message):
     """Print a timestamped progress line; recorded scripts call this before
     each action so the console shows what is happening and when.
 
-    With pauseOnInfo(True) active, each info line also pauses the script
-    until the operator chooses how to proceed."""
+    With screenshotOnInfo(True) active, each info line also saves a full
+    screenshot; with pauseOnInfo(True) active, it pauses the script until
+    the operator chooses how to proceed."""
     _emit("[%s] %s" % (time.strftime("%H:%M:%S"), message))
+    if _shot_dir is not None:
+        _snap_info(message)
     if _pause_on_info:
         _step_pause(message)
+
+
+def screenshotOnInfo(enabled, folder="screenshots"):
+    """Save a full screenshot of the viewport on every info() call.
+
+    PNGs go to <folder> (created if needed; a relative path resolves next
+    to the running script), named "yymmdd hhmmss-<info message>.png" --
+    a visual flight recorder of the whole run.  Info lines that happen
+    before the browser is connected are skipped quietly.  Mind the disk:
+    a long run at a big viewport adds up fast.
+    """
+    global _shot_dir, _shot_warned
+    if not enabled:
+        _shot_dir = None
+        _emit("[%s] Info screenshots off" % time.strftime("%H:%M:%S"))
+        return
+    if not os.path.isabs(folder):
+        base = sys.argv[0] if sys.argv and sys.argv[0] else "."
+        folder = os.path.join(os.path.dirname(os.path.abspath(base)), folder)
+    os.makedirs(folder, exist_ok=True)
+    _shot_dir = folder
+    _shot_warned = False
+    _emit("[%s] Info screenshots on -> %s" % (time.strftime("%H:%M:%S"), folder))
+
+
+def _snap_info(message):
+    global _shot_warned
+    if _page is None:
+        return  # not connected yet -- nothing to grab
+    try:
+        shot = viewportGrab()
+        banned = set('\\/:*?"<>|')
+        safe = "".join("_" if (c in banned or ord(c) < 32) else c
+                       for c in message).strip()[:80].rstrip(" .")
+        if not safe:
+            safe = "info"
+        stamp = time.strftime("%y%m%d %H%M%S")
+        path = os.path.join(_shot_dir, "%s-%s.png" % (stamp, safe))
+        n = 2
+        while os.path.exists(path):
+            path = os.path.join(_shot_dir, "%s-%s (%d).png" % (stamp, safe, n))
+            n += 1
+        shot.save(path)
+    except Exception as e:
+        if not _shot_warned:
+            _shot_warned = True
+            _emit("[%s] (info screenshot failed: %s)" % (time.strftime("%H:%M:%S"), e))
 
 
 def pauseOnInfo(enabled):
@@ -856,13 +908,62 @@ def alarmOnError():
     sys.excepthook = _hook
 
 
+def setViewport(width, height):
+    """Resize the real browser window until the page viewport is exactly
+    width x height CSS pixels.
+
+    Works through the debug connection (no OS window fiddling), restoring
+    a maximized window to normal first when necessary.  Raises
+    RuntimeError when the size cannot be reached (screen too small,
+    below the browser's minimum window size, zoom is not 100%, ...).
+
+    Put psl.setViewport(w, h) at the start of a script to PIN the size it
+    was recorded at: Chrome updates and nudged windows change the
+    viewport by a few pixels, which shifts every recorded coordinate and
+    rescales every capture.
+    """
+    width, height = int(width), int(height)
+    page = _require_page()
+    session = page.context.new_cdp_session(page)
+    try:
+        target_info = session.send("Browser.getWindowForTarget")
+        window_id = target_info["windowId"]
+        if target_info["bounds"].get("windowState", "normal") != "normal":
+            session.send("Browser.setWindowBounds",
+                         {"windowId": window_id, "bounds": {"windowState": "normal"}})
+            time.sleep(0.3)
+        for _ in range(6):
+            vw, vh = viewportSize()
+            if (vw, vh) == (width, height):
+                break
+            bounds = session.send("Browser.getWindowBounds",
+                                  {"windowId": window_id})["bounds"]
+            session.send("Browser.setWindowBounds",
+                         {"windowId": window_id,
+                          "bounds": {"width": bounds["width"] + (width - vw),
+                                     "height": bounds["height"] + (height - vh)}})
+            time.sleep(0.3)
+        vw, vh = viewportSize()
+        if (vw, vh) != (width, height):
+            raise RuntimeError(
+                "Could not reach viewport %dx%d (got %dx%d) -- is the screen "
+                "large enough and zoom at 100%%?" % (width, height, vw, vh))
+        _emit("[%s] Viewport set to %dx%d" % (time.strftime("%H:%M:%S"), width, height))
+    finally:
+        try:
+            session.detach()
+        except Exception:
+            pass
+
+
 def checkViewport(width, height):
     """Alarm unless the live viewport matches the recorded size.
 
     Recorded coordinates only line up when the browser window (and zoom)
     match record time, so a size mismatch would silently click the wrong
-    places.  The alarm lets the operator resize the window and check
-    again, continue anyway, or stop the script (exit code 2).
+    places.  The alarm offers: Fix window size (resize the browser via
+    setViewport to match the recording), Check again, Continue anyway, or
+    Stop the script (exit code 2).
     """
     while True:
         w, h = viewportSize()
@@ -870,12 +971,20 @@ def checkViewport(width, height):
             return
         choice = alarm(
             "Viewport is %dx%d but this script was recorded at %dx%d. "
-            "Resize the browser window (and check zoom)." % (w, h, width, height),
-            buttons=("Check again", "Continue anyway", "Stop the script"))
+            "'Fix window size' resizes the browser to match (also check zoom)."
+            % (w, h, width, height),
+            buttons=("Fix window size", "Check again", "Continue anyway",
+                     "Stop the script"))
         if choice == 0:
-            info("Re-checking viewport...")
+            try:
+                setViewport(width, height)
+            except Exception as e:
+                _emit("[%s] Could not resize: %s" % (time.strftime("%H:%M:%S"), e))
             continue
         if choice == 1:
+            info("Re-checking viewport...")
+            continue
+        if choice == 2:
             info("Viewport mismatch ignored by operator")
             return
         info("Script stopped by operator")
