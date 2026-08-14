@@ -32,6 +32,13 @@ skiplist = [
     (0, 4),
     (0, 5),
     (1, 0),
+    (1, 1),
+    (1, 2),
+    (1, 3),
+    (1, 4),
+    (1, 5),
+    (2, 0),
+    (2, 1),
 ]
 
 for r in range(0, 6):
@@ -140,6 +147,20 @@ for r in range(0, 6):
         # check that the Alignment execute button unpoped (it has red dot while executing)
         psl.info("Screen test 'alignexecutebut' (matchLevel 0.999) -- Alignment execute button")
         psl.verifyFrame('capture-immediate-alignexecutebut-2130,529,2178,548.png', (2130, 529, 2178, 548), 0.999, 'Screen does not match alignexecutebut')        
+
+        # execute focus again after optical center find
+        psl.info('Click at (2262, 869) -- focus again after optical center find')
+        psl.click(2262, 869)
+
+        # 150s was not long enough so bumped up to 240
+        psl.info('Wait 240 second(s) for 2nd focus to complete')
+        psl.wait(240)
+
+
+        # Check Focus Completed
+        psl.info("Screen test 'focusready' (matchLevel 0.99) -- Check 2nd Focus Ready")
+        psl.verifyFrame('capture-immediate-focusready-2384,779,2413,791.png', (2384, 779, 2413, 791), 0.99, 'Screen does not match focusready')
+
 
         # job tab
         psl.info('Click at (1294, 464) -- job tab')
