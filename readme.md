@@ -46,4 +46,22 @@ The script starts in single step mode so you have to click next for each step.
 Once you feel confident that it is working, then you can click the button to run continuously. It will sound an alarm and stop if any tests fail.
 
 # Coordinate System
-<img width="537" height="515" alt="2026-08-12_15h47_07" src="https://github.com/user-attachments/assets/63a60064-1910-4081-aba9-0126617dd2a7" />
+
+<img width="775" height="633" alt="image" src="https://github.com/user-attachments/assets/b28b622e-7e1a-4fc1-8a3e-c05eaad1223a" />
+
+Mapping and ordering with current tray:
+```
+spacing = 28489
+
+# Row 0 is the line of disks closest to the machgine door
+# Col 0 is the row of disks closest to the left side of the machine when looking at it from the front
+
+for r in range(0, 6):
+
+    for c in range(0, 6):
+    
+        psl.info(f"*** Starting cycle for row {r}, column {c} ***")
+
+        xpos = str(int((r - 2.5) * spacing))
+        ypos = str(int((c - 2.5) * -spacing))
+```
