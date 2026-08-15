@@ -36,9 +36,20 @@ skiplist = [
     (1, 2),
     (1, 3),
     (1, 4),
-    (1, 5),
-    (2, 0),
-    (2, 1),
+    # (1, 5),
+    # (2, 0),
+    # (2, 1),
+    # (2, 2),
+    # (2, 3),
+    # (2, 4),
+    # (2, 5),
+    # (3, 0),
+    # (3, 1),
+    # (3, 2),
+    # (3, 3),
+    # (3, 4),
+    # (3, 5),
+    # (4, 0),
 ]
 
 for r in range(0, 6):
@@ -68,12 +79,12 @@ for r in range(0, 6):
         psl.verifyFrame('capture-immediate-checkz-2221,796,2258,809.png', (2221, 796, 2258, 809), 0.99, 'Screen does not match checkz')
 
         # center
-        psl.info('Click at (2312, 742) -- center')
+        psl.info('Click at (2312, 742) -- center button')
         psl.click(2312, 742)
         psl.wait(2)
 
         # execute global alignment
-        psl.info('Click at (1417, 466) -- execute global alignment')
+        psl.info('Click at (1417, 466) -- execute global alignment tab')
         psl.click(1417, 466)
 
         psl.wait(1)
@@ -103,6 +114,7 @@ for r in range(0, 6):
         psl.wait(5) 
 
         # execute focus
+        # if you dont focus before doing optical center, then it will move the stage back to the center to focus
         psl.info('Click at (2262, 869) -- focus')
         psl.click(2262, 869)
 
@@ -110,14 +122,14 @@ for r in range(0, 6):
         # psl.info('Wait 150 second(s) -- 150')
         # psl.wait(150)
 
-        # 150s was not long enough so bumped up to 240
-        psl.info('Wait 240 second(s) for focus to complete')
-        psl.wait(240)
-
+        # # 150s was not long enough so bumped up to 240
+        # Not need, deligated to the optical align script now
+        # psl.info('Wait 240 second(s) for focus to complete')
+        # psl.wait(240)
 
         # Check Focus Completed
         psl.info("Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready")
-        psl.verifyFrame('capture-immediate-focusready-2384,779,2413,791.png', (2384, 779, 2413, 791), 0.99, 'Screen does not match focusready')
+        psl.verifyFrame('capture-immediate-focusready-2384,779,2413,791.png', (2384, 779, 2413, 791), 0.99, 'Screen does not match focusready', delay=10, retrycount=24)
 
         # alignments tab
         psl.info('Click at (1344, 467) -- alignments tab')
@@ -132,35 +144,37 @@ for r in range(0, 6):
         psl.click(2156, 538)
 
         # align modal
-        psl.info('Wait 1 second(s) -- align modal')
+        psl.info('Wait 1 second(s) -- alignment execute modal')
         psl.wait(1)
 
         # really execute find center
-        psl.info('Click at (1953, 796) -- really execute find center')
+        psl.info('Click at (1953, 796) -- OK execute find center')
         psl.click(1953, 796)
 
-        # wait for alignment
-        # this was too close at 60 so increased to 90
-        psl.info('Wait 100 second(s) -- wait for alignment')
-        psl.wait(100)
+        # # wait for alignment
+        # not needed, now in frameverify
+        # # this was too close at 60 so increased to 90
+        # psl.info('Wait 100 second(s) -- wait for alignment')
+        # psl.wait(100)
 
         # check that the Alignment execute button unpoped (it has red dot while executing)
         psl.info("Screen test 'alignexecutebut' (matchLevel 0.999) -- Alignment execute button")
-        psl.verifyFrame('capture-immediate-alignexecutebut-2130,529,2178,548.png', (2130, 529, 2178, 548), 0.999, 'Screen does not match alignexecutebut')        
+        psl.verifyFrame('capture-immediate-alignexecutebut-2130,529,2178,548.png', (2130, 529, 2178, 548), 0.999, 'Screen does not match alignexecutebut', delay=10, retrycount=10)        
 
         # execute focus again after optical center find
+        # we were sometimes getting a focus error after the optical center find so we are going to try to focus again
+        # the optical center script jerks things around a bit so maybe moves the disk?
         psl.info('Click at (2262, 869) -- focus again after optical center find')
         psl.click(2262, 869)
 
-        # 150s was not long enough so bumped up to 240
-        psl.info('Wait 240 second(s) for 2nd focus to complete')
-        psl.wait(240)
-
+        # # 150s was not long enough so bumped up to 240
+        # dont included in the verifyframe now
+        # psl.info('Wait 240 second(s) for 2nd focus to complete')
+        # psl.wait(240)
 
         # Check Focus Completed
         psl.info("Screen test 'focusready' (matchLevel 0.99) -- Check 2nd Focus Ready")
-        psl.verifyFrame('capture-immediate-focusready-2384,779,2413,791.png', (2384, 779, 2413, 791), 0.99, 'Screen does not match focusready')
-
+        psl.verifyFrame('capture-immediate-focusready-2384,779,2413,791.png', (2384, 779, 2413, 791), 0.99, 'Screen does not match focusready', delay=10, retrycount=24)
 
         # job tab
         psl.info('Click at (1294, 464) -- job tab')
@@ -186,13 +200,14 @@ for r in range(0, 6):
         psl.info('Click at (1914, 797) -- START WRITING')
         psl.click(1914, 797)
 
-        # The actual write job running
-        psl.info('Wait 780 second(s) -- The actual write job running')
-        psl.wait(780)
+        # # The actual write job running
+        # now in the verifyframe below, so we dont need to wait here
+        # psl.info('Wait 780 second(s) -- The actual write job running')
+        # psl.wait(780)
 
         # job done popup
         psl.info("Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup")
-        psl.verifyFrame('capture-real-dwl-jobdonepop-1796,710,2053,807.png', (1796, 710, 2053, 807), 0.99, 'Screen does not match jobdonepop')
+        psl.verifyFrame('capture-real-dwl-jobdonepop-1796,710,2053,807.png', (1796, 710, 2053, 807), 0.99, 'Screen does not match jobdonepop', delay=10, retrycount=78)
 
         # Job done OK
         psl.info('Click at (1970, 797) -- Job done OK')
