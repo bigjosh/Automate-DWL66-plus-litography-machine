@@ -762,11 +762,13 @@ class _VerifyPopup:
         self.hidden = True
 
 
-def verifyFrame(baselinePath, box, matchLevel, message, delay=0, retrycount=0):
+def verifyFrame(baselinePath, box, matchLevel, message, delay=0, retrycount=0,
+                fallthru=False):
     """Compare the live screen region against a saved capture PNG.
 
     box is (x1, y1, x2, y2) -- the region the capture was taken from.  On a
-    mismatch a loud alarm is raised offering the operator four choices:
+    mismatch a loud alarm is raised offering the operator four choices
+    (unless fallthru=True, see below):
 
       1. Try compare again -- e.g. after manually putting the target page
          back into the right state
@@ -793,8 +795,15 @@ def verifyFrame(baselinePath, box, matchLevel, message, delay=0, retrycount=0):
     the give-up alarm reports the try count.  The operator's "Try compare
     again" button reruns the whole cycle.
 
+    fallthru=True turns the give-up into a quiet outcome: when the frames
+    still do not match after the last try, no alarm is raised -- a line is
+    logged and False is returned for the caller to act on (branch, retry
+    something else, alarm itself...).  The countdown window and its
+    buttons behave exactly as before while the tries are running.
+
     Returns True when the frames matched (possibly after retries), False
-    when the operator chose to skip.
+    when the operator chose to skip / abort the verify, or -- with
+    fallthru=True -- when the tries ran out without a match.
     """
     if not 0.0 <= matchLevel <= 1.0:
         raise ValueError("matchLevel must be between 0.0 and 1.0")
@@ -855,6 +864,10 @@ def verifyFrame(baselinePath, box, matchLevel, message, delay=0, retrycount=0):
                       % (message, score, attempts, matchLevel))
         else:
             detail = "%s  (similarity %.4f, needs at least %s)" % (message, score, matchLevel)
+        if fallthru:
+            _emit("[%s] Screen test '%s' did not match -- falling through: %s"
+                  % (time.strftime("%H:%M:%S"), display_name, detail))
+            return False
         while True:
             choice = alarm(detail, buttons=("Try compare again", "Show differences",
                                             "Skip and continue", "Stop the script"))
@@ -907,8 +920,12 @@ def _wait_window(seconds):
              fg="white", bg="#1e5631").pack(padx=40, pady=(0, 8))
 
     timer = {"id": None}
+    closed = {"done": False}
 
     def close(outcome):
+        if closed["done"]:
+            return
+        closed["done"] = True
         result["outcome"] = outcome
         if timer["id"] is not None:
             try:
@@ -936,14 +953,15 @@ def _wait_window(seconds):
         except Exception:
             pass
 
-    tick()
     root.protocol("WM_DELETE_WINDOW", lambda: close("dismissed"))  # X = hide, keep waiting
     root.update_idletasks()
     x = (root.winfo_screenwidth() - root.winfo_width()) // 2
     y = (root.winfo_screenheight() - root.winfo_height()) // 3
     root.geometry("+%d+%d" % (x, y))
     root.lift()  # deliberately no focus_force: informational, not an alarm
-    root.mainloop()
+    tick()
+    if not closed["done"]:
+        root.mainloop()
     return result["outcome"], max(0.0, deadline - time.monotonic())
 
 

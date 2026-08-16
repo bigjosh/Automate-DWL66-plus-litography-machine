@@ -36,20 +36,28 @@ skiplist = [
     (1, 2),
     (1, 3),
     (1, 4),
-    # (1, 5),
-    # (2, 0),
-    # (2, 1),
-    # (2, 2),
-    # (2, 3),
-    # (2, 4),
-    # (2, 5),
-    # (3, 0),
-    # (3, 1),
-    # (3, 2),
-    # (3, 3),
-    # (3, 4),
-    # (3, 5),
-    # (4, 0),
+    (1, 5),
+    (2, 0),
+    (2, 1),
+    (2, 2),
+    (2, 3),
+    (2, 4),
+    (2, 5),
+    (3, 0),
+    (3, 1),
+    (3, 2),
+    (3, 3),
+    (3, 4),
+    (3, 5),
+    (4, 0),
+    (4 ,1),
+    (4 ,2),
+    (4 ,3),
+    (4 ,4),
+    (4 ,5),
+    (5, 0),
+    (5, 1),
+    (5, 2),
 ]
 
 for r in range(0, 6):
@@ -205,9 +213,9 @@ for r in range(0, 6):
         # psl.info('Wait 780 second(s) -- The actual write job running')
         # psl.wait(780)
 
-        # job done popup
-        psl.info("Screen test 'jobdonepop' (matchLevel 0.99) -- job done popup")
-        psl.verifyFrame('capture-real-dwl-jobdonepop-1796,710,2053,807.png', (1796, 710, 2053, 807), 0.99, 'Screen does not match jobdonepop', delay=10, retrycount=78)
+        # Job Done Please Remove Tray
+        psl.info("Screen test 'jobfinished' (matchLevel 0.99) -- Joob Done Please Remove Tray")
+        psl.verifyFrame('capture-immediate-jobfinished-1802,744,2043,774.png', (1802, 744, 2043, 774), 0.99, 'Screen does not match jobfinished', delay=10, retrycount=78)
 
         # Job done OK
         psl.info('Click at (1970, 797) -- Job done OK')

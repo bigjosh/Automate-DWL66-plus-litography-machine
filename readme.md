@@ -16,12 +16,14 @@ You need...
 * Python
 * Playwright
 * Pillow
+* Latest version of our Playwright scripting library (get it `copy ..\Playwritght-Script\playwrightscriptlib.py .`)
 
 # Each burn cycle
 
 ## On local computer
 
 1. Start an instance of Chrome with Remote Debugging on port 9992
+   `start "" "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir=C:\crd-data-dir`
 2. Log into Miles' Googlely account
 3. Goto Chrome Remote Desktop and connect to the machine in the clean room. 
 4. Make sure that sleep is disabled! A full 36 disk cycle takes about 12 hours and you will be sad if the machine falls asleep in the middle. 
