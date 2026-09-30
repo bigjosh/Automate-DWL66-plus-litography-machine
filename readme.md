@@ -40,7 +40,7 @@ Do these before starting the script
 # Start Script
 
 Verify the upper left corner of the Chrome debug instance looks like this:
-<img width="462" height="277" alt="image" src="https://github.com/user-attachments/assets/2be38f78-0dcf-469a-afe9-e156109c7d33" />
+<img width="1952" height="806" alt="image" src="https://github.com/user-attachments/assets/3260af94-df18-40ca-9ffe-3445f67d7b2e" />
 
 
 Then run:
