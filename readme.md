@@ -20,7 +20,9 @@ Tell your AI to follow the instructions in [install.md](install.md)
    `start "" "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir=C:\crd-data-dir`
 2. Log into Miles' Googlely account
 3. Goto Chrome Remote Desktop and connect to the machine in the clean room.
-4. Make sure that sleep is disabled! A full 36 disk cycle takes about 12 hours and you will be sad if the machine falls asleep in the middle.
+4. Make sure remote desktop is set to tabs for the multiple screens. We need those tabs to push the window down so everything lines up.
+5. Make sure you are on the tab for Right screen on the laserwirer (the one with the controls).
+6. Make sure that sleep is disabled! A full 36 disk cycle takes about 12 hours and you will be sad if the machine falls asleep in the middle.
 
 ## On laserWriter machine
 
@@ -32,14 +34,24 @@ Do these before starting the script
 * Alignment set to `Find wafer center optical`
 * Make sure the right job is loaded on the Jobs tab (currently `zzzzzzzpf`)
 * Pull up the Laser Write software on the RIGHTHAND monitor. Must be full screen
+* Make sure the upper left corner "Configureation", "Write Mode", and "Automation" slats are stacked vertically, three levels tall. Again we need that to push the window down.
+* Make sure the panel tabs are in the order "Execute a gloabl alignment", "Alignments", and then "Job"
 
 # Start Script
 
+Verify the upper left corner of the Chrome debug instance looks like this:
+<img width="457" height="306" alt="image" src="https://github.com/user-attachments/assets/85395a83-1baa-4a18-bb27-717a65eb0494" />
+
+Then run:
 `python real-dwl.py`
 
 The script starts in single step mode so you have to click next for each step.
 
 Once you feel confident that it is working, then you can click the button to run continuously. It will sound an alarm and stop if any tests fail.
+
+If it says you should resize the window, let it.
+
+If things do not line up right, maybe someone resized the panels in C# Menu. You can close them all and then reopen them from the top menu bar. You might also have to drag them to the button in the center of the panel (it appears while dragging a window) to snap them back to default size.
 
 # Coordinate System
 
