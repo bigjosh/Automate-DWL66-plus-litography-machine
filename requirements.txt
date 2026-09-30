@@ -1,0 +1,6 @@
+# Recommended Windows runtime: Python 3.14.7 or a later 3.14 maintenance release.
+# Tkinter comes with Python. Install Tesseract 5 and English data separately.
+playwright>=1.40
+Pillow>=10
+# NumPy is installed as an OpenCV dependency. No OpenCV GUI is used.
+opencv-python-headless>=4.10
