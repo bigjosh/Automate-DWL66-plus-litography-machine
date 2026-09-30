@@ -1,3 +1,39 @@
+# 2026-09-16 (2,3)
+
+WriteHead_05mm >> The writehead could not be focused! -> WriteHead_05mm >> Calibration of optical autofocus failed: Timeout calibrating optical autofocus
+
+# 2026-9-15 (4,3)
+
+WriteHead_05mm >> The writehead could not be focused! -> WriteHead_05mm >> Calibration of optical autofocus failed: Timeout calibrating optical autofocus
+
+## (4,4) 
+
+WriteHead_05mm >> The writehead could not be focused! -> WriteHead_05mm >> Still out of focus after focus movement!
+
+Skipping 4,4
+
+## (5,3) 
+
+kept failing on 2nd focus. A kind reset everything and did it manually and it worked.
+
+# 2026-09-12 (2,5)
+
+exception while moving 
+
+# 2026-09-12 (2,3)
+
+Lost focus after center find, so there was a popup "not in focus, want to focus?'.
+
+I pulled thge head up and tried to do a center but that got and errror error and then center or load gave nonsense numbers for x,y.
+
+Restarted and that fixed it.
+
+# 2026-09-11 (1,3)
+
+timeout waiting for the aligment to finish and the "executing" to turn to "ready".
+
+Turns out the Screen on chrome remote was stale. Coudl not click on anything. A browswewr refresh fixed it. 
+
 # 2026-08-14 (1,3) failed to read data from the laser metrics.
 
 Expose finished OK but the error messed up the pixel locations so we halted. I had to manually resize all the panels. 
