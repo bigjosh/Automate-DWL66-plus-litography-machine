@@ -40,7 +40,8 @@ Do these before starting the script
 # Start Script
 
 Verify the upper left corner of the Chrome debug instance looks like this:
-<img width="457" height="306" alt="image" src="https://github.com/user-attachments/assets/85395a83-1baa-4a18-bb27-717a65eb0494" />
+<img width="462" height="277" alt="image" src="https://github.com/user-attachments/assets/2be38f78-0dcf-469a-afe9-e156109c7d33" />
+
 
 Then run:
 `python real-dwl.py`
