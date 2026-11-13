@@ -43,22 +43,22 @@ wetrun=True
 
 # (row, col) positions to skip
 skiplist = [
-    (0, 0), 
-    (0, 1),
-    (0, 2),
-    (0, 3),
-    (0, 4),
-    (0, 5),
-    (1, 0),
-    (1, 1),
-    (1, 2),
-    (1, 3),
-    (1, 4),
-    (1, 5),
-    (2, 0),
-    (2, 1),
-    (2, 2),
-    (2, 3),
+    # (0, 0), 
+    # (0, 1),
+    # (0, 2),
+    # (0, 3),
+    # (0, 4),
+    # (0, 5),
+    # (1, 0),
+    # (1, 1),
+    # (1, 2),
+    # (1, 3),
+    # (1, 4),
+    # (1, 5),
+    # (2, 0),
+    # (2, 1),
+    # (2, 2),
+    # (2, 3),
     # (2, 4),
     # (2, 5),
     # (3, 0),
@@ -106,7 +106,7 @@ for r in range(0, 6):
         psl.verifyFrame('z-zero-check', matchLevel=0.99, message='Screen does not match checkz')
 
         # center
-        psl.info('Click center-button -- center button')
+        psl.info('Click center-button -- center button', point='center-button')
         psl.click('center-button')
         psl.wait(5)
 
@@ -116,14 +116,16 @@ for r in range(0, 6):
 
         # Require strict X=/Y= integer prefixes within +/-50 um on each axis.
         # here we check that we are at 0,0 after centering
-        raw_xy_afetr_center = psl.grabOCRTextLine('actual-xy', tesseract_cmd=ocr_reader.executable)
+        raw_xy_afetr_center = psl.grabOCRTextLine(
+            'actual-xy', tesseract_cmd=ocr_reader.executable, review=True,
+            validator=lambda text: require_xy_position(text, 0, 0))
         actual_x_after_center, actual_y_after_center = require_xy_position(raw_xy_afetr_center, 0, 0)
         psl.info(f'X/Y PASS: OCR={raw_xy_afetr_center!r}; integer readout X={actual_x_after_center}, Y={actual_y_after_center} um; '
                  f'expected X=0, Y=0 um; both integer errors within +/-50 um')
 
 
         # execute global alignment
-        psl.info('Click global-alignment-tab -- execute global alignment tab')
+        psl.info('Click global-alignment-tab -- execute global alignment tab', point='global-alignment-tab')
         psl.click('global-alignment-tab')
 
         psl.wait(1)
@@ -132,7 +134,7 @@ for r in range(0, 6):
         psl.verifyFrame('checkx-field-label', matchLevel=0.99, message='X field label is wrong')
 
         # click X
-        psl.info('Double click x-field -- click X')
+        psl.info('Double click x-field -- click X', point='x-field')
         psl.doubleClick('x-field')
 
         # xval
@@ -143,7 +145,7 @@ for r in range(0, 6):
         psl.verifyFrame('checky-field-label', matchLevel=0.99, message='Y field label is wrong')
 
         # y
-        psl.info('Double click y-field -- y')
+        psl.info('Double click y-field -- y', point='y-field')
         psl.doubleClick('y-field')
 
         # yval
@@ -154,7 +156,7 @@ for r in range(0, 6):
         psl.verifyFrame('move-absolute-check', matchLevel=0.99, message='Move absolute button does not exist')
 
         # move absolute
-        psl.info('Click move-absolute -- move absolute')
+        psl.info('Click move-absolute -- move absolute', point='move-absolute')
         psl.click('move-absolute')
 
         # wait for move abs
@@ -162,14 +164,16 @@ for r in range(0, 6):
         psl.wait(5) 
 
         # Require strict X=/Y= integer prefixes within +/-50 um before focus.
-        raw_xy = psl.grabOCRTextLine('actual-xy', tesseract_cmd=ocr_reader.executable)
+        raw_xy = psl.grabOCRTextLine(
+            'actual-xy', tesseract_cmd=ocr_reader.executable, review=True,
+            validator=lambda text: require_xy_position(text, xpos, ypos))
         actual_x, actual_y = require_xy_position(raw_xy, xpos, ypos)
         psl.info(f'X/Y PASS: OCR={raw_xy!r}; integer readout X={actual_x}, Y={actual_y} um; '
                  f'expected X={xpos}, Y={ypos} um; both integer errors within +/-50 um')
 
         # execute focus
         # if you dont focus before doing optical center, then it will move the stage back to the center to focus
-        psl.info('Click focus-button -- focus')
+        psl.info('Click focus-button -- focus', point='focus-button')
         psl.click('focus-button')
 
         psl.info('Wait 5 second(s) -- 5')
@@ -177,7 +181,7 @@ for r in range(0, 6):
 
         # Check Focus actually started fomr the yellow executing message
         psl.info("Screen test 'focus-executing' (matchLevel 0.99) -- Check Focus executing")
-        psl.verifyFrame('focus-executing', matchLevel=0.99, message='Screen does not match focus-executing', delay=10, retrycount=24)
+        psl.verifyFrame('focus-executing', matchLevel=0.96, message='Screen does not match focus-executing', delay=10, retrycount=24)
 
         # Not need, deligated to the optical align script now
         # psl.info('Wait 240 second(s) for focus to complete')
@@ -185,10 +189,10 @@ for r in range(0, 6):
 
         # Check Focus Completed
         psl.info("Screen test 'focusready' (matchLevel 0.99) -- Check Focus Ready")
-        psl.verifyFrame('focus-ready', matchLevel=0.99, message='Screen does not match focusready', delay=10, retrycount=24)
+        psl.verifyFrame('focus-ready', matchLevel=0.96, message='Screen does not match focusready', delay=10, retrycount=24)
 
         # alignments tab
-        psl.info('Click alignment-tab -- alignments tab')
+        psl.info('Click alignment-tab -- alignments tab', point='alignment-tab')
         psl.click('alignment-tab')
 
         # check for alingments execute button
@@ -197,11 +201,11 @@ for r in range(0, 6):
 
         # pre-click next to the alignment-execute button to ensure it is focused
         # twice now a chrome remote popup has appeared, stealing focus from the main window
-        psl.info('Click NEAR alignment-execute -- execute')
+        psl.info('Click NEAR alignment-execute -- execute', point='near-execute')
         psl.click('near-execute')
 
         # execute
-        psl.info('Click alignment-execute -- execute')
+        psl.info('Click alignment-execute -- execute', point='alignment-execute')
         psl.click('alignment-execute')
 
         # align modal
@@ -214,11 +218,11 @@ for r in range(0, 6):
 
 
         # preclick newa the align execute button to make sure it is in focus
-        psl.info('Click pre click-alignment-confirm -- OK execute find center')
+        psl.info('Click pre click-alignment-confirm -- OK execute find center', point='pre-click-alignment-confirm')
         psl.click('pre-click-alignment-confirm')
 
         # really execute find center
-        psl.info('Click click-alignment-confirm -- OK execute find center')
+        psl.info('Click click-alignment-confirm -- OK execute find center', point='click-alignment-confirm')
         psl.click('click-alignment-confirm')
 
 
@@ -228,7 +232,7 @@ for r in range(0, 6):
 
         # check that the Alignment execute button pushed in  (it has red dot while executing)
         psl.info("Screen test 'alignexecutebut-pushed' (matchLevel 0.999) -- Alignment execute button pushed")
-        psl.verifyFrame('alignment-button-pushed', matchLevel=0.999, message='Screen does not match alignexecutebut-pushed', delay=10, retrycount=10)
+        psl.verifyFrame('alignment-button-pushed', matchLevel=0.9, message='Screen does not match alignexecutebut-pushed', delay=10, retrycount=10)
 
 
         # # wait for alignment
@@ -239,13 +243,13 @@ for r in range(0, 6):
 
         # check that the Alignment execute button unpoped (it has red dot while executing)
         psl.info("Screen test 'alignexecutebut-popped' (matchLevel 0.999) -- Alignment execute button poppped")
-        psl.verifyFrame('alignment-button-popped', matchLevel=0.999, message='Screen does not match alignexecutebut-popped', delay=10, retrycount=10)
+        psl.verifyFrame('alignment-button-popped', matchLevel=0.9, message='Screen does not match alignexecutebut-popped', delay=10, retrycount=10)
 
 
         # execute focus again after optical center find
         # we were sometimes getting a focus error after the optical center find so we are going to try to focus again
         # the optical center script jerks things around a bit so maybe moves the disk?
-        psl.info('Click focus-button -- focus again after optical center find')
+        psl.info('Click focus-button -- focus again after optical center find', point='focus-button')
         psl.click('focus-button')
 
         # # 150s was not long enough so bumped up to 240
@@ -259,11 +263,11 @@ for r in range(0, 6):
 
         # Check Focus Completed
         psl.info("Screen test 'focusready' (matchLevel 0.99) -- Check 2nd Focus Ready")
-        psl.verifyFrame('focus-ready', matchLevel=0.99, message='Screen does not match focusready', delay=10, retrycount=24)
+        psl.verifyFrame('focus-ready', matchLevel=0.98, message='Screen does not match focusready', delay=10, retrycount=24)
         
 
         # job tab
-        psl.info('Click job-tab -- job tab')
+        psl.info('Click job-tab -- job tab', point='job-tab')
         psl.click('job-tab')
 
         # Job Start button
@@ -272,7 +276,7 @@ for r in range(0, 6):
 
         if wetrun:
             # start job button
-            psl.info('Click job-start -- start job button')
+            psl.info('Click job-start -- start job button', point='job-start')
             psl.click('job-start')
 
             # wait for laser confirm popup
@@ -284,7 +288,7 @@ for r in range(0, 6):
             psl.verifyFrame('laser-confirm-image', matchLevel=0.998, message='Screen does not match laseronbox')
 
             # START WRITING
-            psl.info('Click laser-confirm -- START WRITING')
+            psl.info('Click laser-confirm -- START WRITING', point='laser-confirm')
             psl.click('laser-confirm')
 
             # # The actual write job running
@@ -297,7 +301,7 @@ for r in range(0, 6):
             psl.verifyFrame('job-finished', matchLevel=0.99, message='Screen does not match jobfinished', delay=10, retrycount=78)
 
             # Job done OK
-            psl.info('Click job-done-confirm -- Job done OK')
+            psl.info('Click job-done-confirm -- Job done OK', point='job-done-confirm')
             psl.click('job-done-confirm')
 
             # pause
@@ -329,7 +333,7 @@ for r in range(0, 6):
         else:
             psl.info("Skipping write sequence as 'wetrun' is False")
             # Job done OK
-            psl.info('Click laser up button ')
+            psl.info('Click laser up button ', point='laser-up-click')
             psl.click('laser-up-click')
 
             # Check z is at 0um

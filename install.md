@@ -174,6 +174,54 @@ On a startup size mismatch, choose **Restore saved size**, **Check again**, or
 match before continuing. Changes to the actual panel arrangement require
 redefining the affected entries or choosing a new layout folder.
 
+During a comparison with a delay or retries, choose **Final compare now** to
+take one fresh comparison immediately and cancel the remaining retries. A
+mismatch opens the usual alarm so you can recapture without waiting for the
+countdown to finish; a match passes normally. Choosing **Try compare again**
+or saving a replacement starts a fresh cycle with the original delay and
+retry count.
+
+When a saved image no longer matches, choose **Recapture reference** in the
+failed-comparison alarm. The old image is shown before capture and remains
+visible while you select the replacement rectangle. Put the application in
+the intended expected state, choose **Capture replacement**, select the area,
+then review the old and new images and choose **Use as expected reference**.
+The named frame's PNG and bounds are saved, retaining the old PNG, and a fresh
+comparison runs with the original threshold and retry settings. Cancel returns
+to the failed-comparison alarm without saving or passing the check.
+
+Recapturing updates only that frame. Separately redefine click locations and
+OCR regions if those controls moved. A ready-state check must still capture
+the ready state; do not accept a busy/error screen just to clear a mismatch.
+If the script is already running when you update the library, restart it to
+load the new button.
+
+In single-step mode, each named click or double-click in `real-dwl.py` also
+offers **Reassign click location**. Select that button and click the new target
+on the frozen screenshot. The point is saved in the selected layout, and the
+same step remains paused; choose **Next Step** when ready to send the click.
+Canceling the picker leaves the old point unchanged and returns to the pause.
+Closing a click-step dialog stops the script. Reassignment sends no input to
+the remote application; the pending click still runs its popup guard before
+execution. Continuous mode does not show these editing buttons.
+
+Both X/Y OCR checks now offer **Redefine OCR area**. In single-step mode,
+the OCR pause shows the current crop and recognized text. Select **Redefine
+OCR area**, drag the replacement rectangle on a frozen screenshot, and review
+its crop and OCR result before choosing **Save OCR area**. Allow enough width
+for both full coordinates, including minus signs and five-digit values.
+Both checks share `actual-xy`, so one saved change applies to both.
+
+Saving returns to a paused preview; **Next Step** reads fresh pixels and checks
+the X/Y values before proceeding. Cancel preserves the previous rectangle.
+OCR or position-validation failures offer **Retry**, **Redefine OCR area**, or
+**STOP**, including in continuous mode. There is no skip option. Retry reads
+again without repeating a move, focus, or exposure. The existing integer
+parsing and +/-50 um tolerance still apply. A proposed area must produce one
+readable text line before it can be saved; that does not accept its position
+values. OCR installation, viewport, screenshot, and save failures still stop
+the operation. Restart the script to load this feature.
+
 ## Start the production script
 
 From the DWL repository folder, after installation and machine preparation:

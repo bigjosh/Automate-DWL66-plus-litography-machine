@@ -17,8 +17,8 @@ Tell your AI to follow the instructions in [install.md](install.md)
 ## On local computer
 
 1. Start an instance of Chrome with Remote Debugging on port 9222
-   `start "" "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir=C:\crd-data-dir`
-2. Log into Miles' Googlely account
+   `start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir=C:\crd-data-dir`
+2. Log into Dirty Miles' Googlely account
 3. Goto Chrome Remote Desktop and connect to the machine in the clean room.
 4. Make sure that sleep is disabled! A full 36 disk cycle takes about 12 hours and you will be sad if the machine falls asleep in the middle.
 
@@ -30,7 +30,7 @@ Do these before starting the script
 * Start with machine in LOAD position
 * Set up the global alignment panel to option P1
 * Alignment set to `Find wafer center optical`
-* Make sure the right job is loaded on the Jobs tab (currently `zzzzzzzpf`)
+* Make sure the right job is loaded on the Jobs tab (currently `zzzzzzzpfstandardraster1103`)
 * Pull up the Laser Write software on the RIGHTHAND monitor. Must be full screen
 
 # Start Script

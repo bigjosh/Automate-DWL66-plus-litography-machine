@@ -1,3 +1,82 @@
+# 2026-10-12 (4,2)
+
+AF Momnent error
+
+Alos lots of other errors this run, but i think all were from chrome remote desktop popups - so mouse was not turned over.
+
+
+# 2026-10-12 (0,4)
+
+Restarted on already written disk position. :(
+
+Also we got a anyhelp desk popup from someone wanting to jump onto the mahcine?
+
+# 2026-10-12 (1,3)
+
+Movement error
+
+Lifting head then egenrated a focus error.
+
+
+#2026-10-01 (0,2)
+
+Movement error
+
+
+# 2026-09-30 (3,0)
+
+<EXCEPTION>
+Type: MovementException
+
+C#-Menu 1.9 Rev. 11066
+
+System: HI941 Columbia University
+
+CreationTime: 9/30/2026 12:05:29 AM
+
+ErrorCode: 0x0
+
+Message: 
+DigitalAFCard >> Exception while movement
+
+<Additional Data>
+<Error>
+Movement command <move zI -menu -d=250 
+> reported error <39>: movement electr def, pos. 64447
+</Error>
+<MovementErrorCode>
+39
+</MovementErrorCode>
+<DeviceIdentification>
+DigitalAFCard
+</DeviceIdentification>
+</Additional Data>
+
+
+<StackTrace>
+   at HIMT.Components.WriteHeads.Digital.DigitalAutofocusCard.SendCommand(String Command, CommonDeviceAction Reference, Boolean IsMovement, Boolean IsFocusMovement, Boolean NoPositionEvents)
+   at HIMT.Components.WriteHeads.Digital.DigitalAutofocusCard.InitializeStepperDelegate(CommonDeviceAction Reference)
+   at HIMT.Components.Common.VoidCommandExecutionAction.ExecutionImplementation()
+   at HIMT.Components.Common.CommonDeviceAction.Execute(Boolean Queued)
+   at HIMT.Components.Common.CommonDeviceAction.ThrowLastException()
+   at HIMT.Components.Common.BaseCDCommand.ExecuteAction(CommonDeviceAction Action, Boolean Wait4Execution, Boolean PublishException)
+   at HIMT.Components.WriteHeads.Digital.DigitalWriteHead.InitializeCoordinatesImplementation(CommonDeviceAction Reference)
+   at HIMT.Lithography.Systems.Components.WriteHeads.CommonWriteHead.InitializeCoordinatesDelegate(CommonDeviceAction Reference)
+   at HIMT.Lithography.Systems.Components.WriteHeads.CommonWriteHead.StandByDelegate(CommonDeviceAction Reference)
+   at HIMT.Components.Common.VoidCommandExecutionAction.ExecutionImplementation()
+   at HIMT.Components.Common.CommonDeviceAction.Execute(Boolean Queued)
+   at HIMT.Components.Common.CommonDeviceAction.ThrowLastException()
+   at HIMT.Components.Common.BaseCDCommand.ExecuteAction(CommonDeviceAction Action, Boolean Wait4Execution, Boolean PublishException)
+   at HIMT.Components.Common.VoidCDCommand.Execute(Int32 ExecutionTimeout, IAbortable Abortable, Boolean PublishException, eDebugLevel DebugLevel)
+   at HIMT.Lithography.Systems.Components.WriteHeads.CommonWriteHead.MoveToStandByPosition(Int32 ExecutionTimeout, IAbortable Abortable)
+   at HIMT.Lithography.Systems.LithographySystem.MoveWriteHeadToStandBy(IAbortable Abortable)
+   at HIMT.Lithography.Systems.LithographySystem.PrepareUnload(CommonDeviceAction Reference, ILoadableJob Job, ItemLoadMode LoadMode)
+   at HIMT.ProcessSystems.ProcessSystem.Unload(CommonDeviceAction Reference, ILoadableJob Job, ItemLoadMode LoadMode)
+   at HIMT.ProcessSystems.Processing.ProcessItem.Process(Boolean TestAlignmentMode, CommonDeviceAction Reference, ProcessItemProcessResult Result, IContainerProcessItem Parent)
+</StackTrace>
+</EXCEPTION>
+
+
 # 2026-09-16 (2,3)
 
 WriteHead_05mm >> The writehead could not be focused! -> WriteHead_05mm >> Calibration of optical autofocus failed: Timeout calibrating optical autofocus

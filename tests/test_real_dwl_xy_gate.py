@@ -31,6 +31,7 @@ class FakePSL(ModuleType):
         self.move_reads = []
         self.pending = {}
         self.pending_read = None
+        self.click_point = None
         self.field = None
         self.read_results = read_results or {}
         self.center_read_results = center_read_results or {}
@@ -44,7 +45,8 @@ class FakePSL(ModuleType):
     def alarmOnError(self):
         pass
 
-    def info(self, text):
+    def info(self, text, *, point=None):
+        self.click_point = point
         self.events.append(("info", str(text)))
 
     def connect(self, url, *, page_hint):
@@ -71,6 +73,9 @@ class FakePSL(ModuleType):
         self.events.append(("verify", name))
 
     def doubleClick(self, name):
+        if self.click_point != name:
+            raise AssertionError("Click pause must identify the pending double-click point")
+        self.click_point = None
         if name not in {"x-field", "y-field"}:
             raise AssertionError(f"Unexpected input field: {name}")
         self.field = name[0]
@@ -85,6 +90,9 @@ class FakePSL(ModuleType):
         self.events.append(("type", text))
 
     def click(self, name):
+        if self.click_point != name:
+            raise AssertionError("Click pause must identify the pending click point")
+        self.click_point = None
         if not any(event[0] == "click-guard" for event in self.events):
             raise AssertionError("Machine click before CRD popup guard setup")
         if name == "center-button":
@@ -100,7 +108,9 @@ class FakePSL(ModuleType):
     def wait(self, seconds):
         self.events.append(("wait", seconds))
 
-    def grabOCRTextLine(self, name, *, tesseract_cmd):
+    def grabOCRTextLine(self, name, *, tesseract_cmd, review=False, validator=None):
+        if not review or not callable(validator):
+            raise AssertionError("Production XY reads require review/recovery and position validation")
         if self.pending_read is None:
             raise AssertionError("OCR read requires a fresh center or absolute move")
         phase, x, y = self.pending_read
@@ -119,6 +129,7 @@ class FakePSL(ModuleType):
                 result = result(x, y)
         if isinstance(result, BaseException):
             raise result
+        validator(result)
         return result
 
 
