@@ -158,8 +158,9 @@ Before starting the production script:
 
 - Load the 36 disks into the tray and the tray into the machine; start with
   the machine in its LOAD position.
-- Set up the global alignment panel to option P1 and select
-  `Find wafer center optical` in Alignments.
+- Set up the global alignment panel to option P1 for the absolute move.
+  In the Stage panel, check **Reset Offset** and **Reset Rotation** beside
+  **CENTER** so the next disk's move starts in the calibration coordinate frame.
 - Use the intended optical autofocus mode and verify the correct exposure job
   is loaded on the Jobs tab.
 - Put the laser writer software on the right-hand monitor, maximized, with
@@ -196,29 +197,33 @@ the ready state; do not accept a busy/error screen just to clear a mismatch.
 If the script is already running when you update the library, restart it to
 load the new button.
 
-In single-step mode, each named click or double-click in `real-dwl.py` also
-offers **Reassign click location**. Select that button and click the new target
-on the frozen screenshot. The point is saved in the selected layout, and the
-same step remains paused; choose **Next Step** when ready to send the click.
+In single-step mode, choose **Show click location** before any named click or
+double-click in `real-dwl.py` to see the saved target on a fresh screenshot.
+The crosshair and magnified view show where the click will land. Choose
+**Back to step** to return to the same pause. Open the preview again to refresh it.
+
+To move the target, choose **Reassign click location** and click the new
+target on the frozen screenshot. The point is saved in the selected layout.
+Choose **Next Step** when ready to send the click.
 Canceling the picker leaves the old point unchanged and returns to the pause.
 Closing a click-step dialog stops the script. Reassignment sends no input to
 the remote application; the pending click still runs its popup guard before
 execution. Continuous mode does not show these editing buttons.
 
-Both X/Y OCR checks now offer **Redefine OCR area**. In single-step mode,
+The X/Y OCR checks offer **Redefine OCR area**. In single-step mode,
 the OCR pause shows the current crop and recognized text. Select **Redefine
 OCR area**, drag the replacement rectangle on a frozen screenshot, and review
 its crop and OCR result before choosing **Save OCR area**. Allow enough width
 for both full coordinates, including minus signs and five-digit values.
-Both checks share `actual-xy`, so one saved change applies to both.
+All three checks share `actual-xy`, so one saved change applies to all three.
 
 Saving returns to a paused preview; **Next Step** reads fresh pixels and checks
 the X/Y values before proceeding. Cancel preserves the previous rectangle.
 OCR or position-validation failures offer **Retry**, **Redefine OCR area**, or
 **STOP**, including in continuous mode. There is no skip option. Retry reads
-again without repeating a move, focus, or exposure. The existing integer
-parsing and +/-50 um tolerance still apply. A proposed area must produce one
-readable text line before it can be saved; that does not accept its position
+again without repeating a move, focus, or exposure. Production accepts an
+integer readout within ±500 µm (±0.5 mm) of the target on each axis. A proposed
+area must produce one readable text line before it can be saved; that does not accept its position
 values. OCR installation, viewport, screenshot, and save failures still stop
 the operation. Restart the script to load this feature.
 
@@ -230,6 +235,11 @@ From the DWL repository folder, after installation and machine preparation:
 .\.venv\Scripts\python.exe real-dwl.py --layout "layouts\2026-09-11-afternoon"
 ```
 
+At startup the script reads `plate-calibration.json` beside `real-dwl.py`.
+Use `--transform-file "path\plate-calibration.json"` to select another file.
+For each disk it logs the local target in µm, applies the saved transform,
+and rounds the stage coordinates to whole µm for Move absolute and its OCR check.
+
 Omit `--layout` to choose a folder interactively. If Tesseract is installed in a
 different location, use an explicit path, for example:
 
@@ -239,10 +249,87 @@ different location, use an explicit path, for example:
 
 The script starts in single-step mode. Advance with the operator controls or
 select continuous operation when ready. Logs and screenshots are saved under
-`runs\<timestamp>`. The script checks the X/Y integer readouts within +/-50 um
-on each axis after centering and after the absolute move, before focusing.
+`runs\<timestamp>`. The script checks the X/Y integer readouts within ±500 µm
+on each axis after CENTER and after the calibrated move. The script focuses
+once, waits for the executing and ready indicators, clicks **Set zero**, and
+checks that Actual X/Y are within the same tolerance of (0,0) before opening
+the Job tab. At the next disk it checks the CENTER reset options again.
+If your layout asks for `center-reset-options`, select the two checked boxes.
+For `set-zero-button-image` and `set-zero-button`, select the Stage panel's
+**Set zero** button as the reference image and click point, respectively.
 The CRD popup guard waits up to 30 seconds before mouse clicks and keyboard
 operations; a persistent popup prevents the pending input and raises an error.
+
+## Test a plate calibration with three corners
+
+Use the existing layout and select `Find wafer center optical`. Disable the
+setting that zeros X/Y after center finding, and keep the stage origin and
+rotation unchanged throughout this test. Start with the head raised at Z=0
+and the usual nominal plate coordinate system. The test moves and focuses,
+but does not expose or change the production script.
+
+```powershell
+.\.venv\Scripts\python.exe calibrate-plate.py --layout "layouts\2026-09-11-afternoon"
+```
+
+The script starts in single-step mode and retains the click reassignment,
+reference recapture, OCR-area editing, and CRD popup guard. Check the
+`laser-up-click` location when first using the head-raise step if that point
+has not yet been updated for the new screen layout. Every required frame
+check must pass; **Skip and continue** or **Abort verify** stops this test.
+
+It visits `(0,0)` and `(5,5)` at their nominal positions, focuses once on each,
+finds each center, and records the displayed coordinates. It fits translation,
+rotation, and uniform scale, allowing the printed jig's actual pitch to differ
+from the nominal 28,489 um spacing. The nominal half-micrometer coordinates
+are retained for the fit; movement commands are
+rounded to whole micrometers. The head is raised and verified between disks.
+
+After fitting, it writes `plate-calibration.json` beside the script, then
+**reloads that file** to predict and move to `(0,5)`. A final focus and center
+find measures the independent error. The third corner never enters the fit.
+The script reports signed X/Y errors and their combined distance, measured
+minus predicted, and raises the head at completion. It also reports the
+measured-to-nominal baseline ratio used as the scale factor. Both calibration
+points fit exactly by construction; that is not an independent accuracy check.
+
+The reusable JSON contains a version, units, nominal grid spacing, scale,
+rotation matrix, translation, a complete 3x3 transform matrix, both calibration
+measurements, and the third-corner validation result. New files use version 2
+and model `similarity_2d`. The file has `validation: null` until that measurement
+succeeds. The
+`plate_transform.load_calibration()` helper validates the file and loads its
+transform; it also reads the original version-1 rigid files with scale fixed
+at 1. The version-2 loader rejects missing/invalid scale and inconsistent
+matrices. Production seeks use the plate placement and stage coordinate frame
+in which the centers were measured. Reloading/reseating the plate or changing
+that coordinate frame requires a new calibration. Two reference points determine a common scale,
+rotation, and translation; they do not determine separate X/Y stretch, shear,
+or individual disk placement errors. The third corner checks the model.
+
+For any nominal plate center `(x, y)` in micrometers, the saved mapping is
+`machine_xy = scale * rotation_matrix * [x, y] + translation_um`.
+Equivalently, multiply `transform_matrix` by the column vector `[x, y, 1]`.
+`load_calibration(path).apply(plate_position(row, col))` performs the complete
+mapping with the default nominal pitch. Keep fractional nominal centers;
+round only the final machine command. This maps disk centers and does not
+change the size or orientation of the exposure design itself.
+
+Use `--transform-file "path\plate-calibration.json"` to choose another shared
+file, `--spacing` for another pitch in um, or `--tesseract-cmd` if needed.
+Existing calibration files are backed up into the new run folder before
+replacement. Detailed results, raw OCR strings, log, and screenshots are
+saved under `runs\plate-calibration-<timestamp>`. Results are saved after
+each center find; `--output-dir` selects a different run folder.
+
+Calibration reads preserve decimal fractions and use the strict whole-line
+parser. Ambiguous OCR offers **Retry**, **Redefine OCR area**, or **STOP**;
+it is not silently repaired. Before each focus, the measured seek position
+must be within +/-50 um of the command on each axis. A found center at least
+half a grid spacing from its command is rejected as a possible wrong disk
+or coordinate reset. These checks do not set an acceptable calibration error.
+On interruption, no automatic recovery motion is sent; inspect the current
+head/stage state before restarting.
 
 ## Updating the shared library (optional)
 

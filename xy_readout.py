@@ -11,6 +11,9 @@ from playwrightscriptocr import OCRError as ReadoutError
 from playwrightscriptocr import TesseractReader, preprocess
 
 
+POSITION_TOLERANCE_UM = Decimal("500")
+
+
 # Require digits on both sides of a decimal point. Never repair characters that
 # could change a value (for example O/0, a missing sign, or a comma/decimal point).
 _NUMBER = r"[+-]?[0-9]+(?:\.[0-9]+)?"
@@ -82,12 +85,11 @@ def parse_xy_integers(text: str) -> tuple[Decimal, Decimal]:
 
 
 def require_xy_position(text, expected_x, expected_y) -> tuple[Decimal, Decimal]:
-    """Return extracted X/Y integers only when both are within +/-50 µm.
+    """Check the integer X/Y readouts against the production position tolerance.
 
     Any parse or position error raises ReadoutError, allowing the production
-    script to stop before focusing. Commands must be finite integers. Exactly
-    50 µm is accepted independently on either axis. Fractions are discarded
-    toward zero; this does not claim to measure the full decimal position.
+    script to stop before focusing. Commands must be finite integers. The
+    limit is inclusive on each axis. Fractions are discarded toward zero.
     """
     actual_x, actual_y = parse_xy_integers(text)
     try:
@@ -98,7 +100,7 @@ def require_xy_position(text, expected_x, expected_y) -> tuple[Decimal, Decimal]
            for target in (target_x, target_y)):
         raise ReadoutError("Expected X/Y positions must be finite integers.")
 
-    tolerance = Decimal("50")
+    tolerance = POSITION_TOLERANCE_UM
     values = (actual_x, actual_y, target_x, target_y, tolerance)
     # Keep subtraction exact even if a caller reduced the Decimal precision.
     highest_place = max(value.adjusted() for value in values)

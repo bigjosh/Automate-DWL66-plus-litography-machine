@@ -28,10 +28,16 @@ Do these before starting the script
 
 * Load 36 disks into tray and tray in machine
 * Start with machine in LOAD position
+* Pull up the Laser Write software on the RIGHTHAND monitor. Must be full screen and should look like this...
+    ![alt text](image-3.png)
+* Check that the Control tabs are Job, Execute a Global Alignment, and Aligments just like this...
+    ![alt text](image-4.png)
 * Set up the global alignment panel to option P1
-* Alignment set to `Find wafer center optical`
+* In the FindWaferCenterOptical panel, make sure `Set Zero` is `Flase`...
+    ![alt text](image-5.png)
+* Check Reset Offset and Reset Rotation beside CENTER for calibrated moves.
 * Make sure the right job is loaded on the Jobs tab (currently `zzzzzzzpfstandardraster1103`)
-* Pull up the Laser Write software on the RIGHTHAND monitor. Must be full screen
+
 
 # Start Script
 
@@ -47,7 +53,7 @@ Once you feel confident that it is working, then you can click the button to run
 
 Mapping and ordering with current tray:
 ```
-spacing = 28489
+spacing, plate_to_stage = load_plate_calibration("plate-calibration.json")
 
 # Row 0 is the line of disks closest to the machgine door
 # Col 0 is the row of disks closest to the left side of the machine when looking at it from the front
@@ -58,6 +64,14 @@ for r in range(0, 6):
 
         psl.info(f"*** Starting cycle for row {r}, column {c} ***")
 
-        xpos = str(int((r - 2.5) * spacing))
-        ypos = str(int((c - 2.5) * -spacing))
+        local_xy = plate_position(r, c, spacing)
+        stage_x, stage_y = plate_to_stage.apply(local_xy)
+        xpos, ypos = str(round(stage_x)), str(round(stage_y))
 ```
+
+
+# Notes on co ord transform
+
+Production verifies the calibrated move, focuses once, then clicks Set zero
+at the disk center and checks the X/Y readout before starting the exposure.
+

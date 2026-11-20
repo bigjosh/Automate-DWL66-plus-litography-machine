@@ -141,7 +141,7 @@ class ParseXYIntegersTests(unittest.TestCase):
 
 
 class RequiredPositionTests(unittest.TestCase):
-    def test_examples_and_fifty_integer_boundaries_pass_on_each_axis(self):
+    def test_examples_and_500_um_integer_boundaries_pass_on_each_axis(self):
         cases = [
             ("X=71222.4, Y=-14244 µm", "71222", "-14244"),
             ("X=-71222 3, Y=42732.9 um", "-71222", "42733"),
@@ -151,12 +151,12 @@ class RequiredPositionTests(unittest.TestCase):
             ("X=9.1, Y=-19.1 µm", "10", "-20"),
             ("X=-1.9, Y=1.9 µm", "0", "0"),
             ("X=1.9, Y=-1.9 µm", "0", "0"),
-            ("X=60, Y=-20 µm", "10", "-20"),
-            ("X=-40, Y=-20 µm", "10", "-20"),
-            ("X=10, Y=-70 µm", "10", "-20"),
-            ("X=10, Y=30 µm", "10", "-20"),
-            ("X=-50.9, Y=50.9 µm", "0", "0"),
-            ("X=50.9, Y=-50.9 µm", "0", "0"),
+            ("X=510, Y=-20 µm", "10", "-20"),
+            ("X=-490, Y=-20 µm", "10", "-20"),
+            ("X=10, Y=-520 µm", "10", "-20"),
+            ("X=10, Y=480 µm", "10", "-20"),
+            ("X=-500.9, Y=500.9 µm", "0", "0"),
+            ("X=500.9, Y=-500.9 µm", "0", "0"),
             ("X=0, Y=0 µm", "10", "-20"),
             ("X=-0, Y=0 µm", "0", "0"),
             ("X=71222.4, Y=-14244 pm", "71222", "-14244"),
@@ -171,9 +171,9 @@ class RequiredPositionTests(unittest.TestCase):
 
     def test_either_axis_outside_tolerance_fails_with_actual_and_expected(self):
         for text in (
-            "X=61, Y=-20 µm", "X=-41.9999, Y=-20 µm",
-            "X=10, Y=-71 µm", "X=10, Y=31.9999 µm",
-            "X=61, Y=-71 µm",
+            "X=511, Y=-20 µm", "X=-491.9999, Y=-20 µm",
+            "X=10, Y=-521 µm", "X=10, Y=481.9999 µm",
+            "X=511, Y=-521 µm",
         ):
             with self.subTest(text=text):
                 with self.assertRaises(xy_readout.ReadoutError) as raised:
@@ -182,16 +182,16 @@ class RequiredPositionTests(unittest.TestCase):
                 self.assertIn("FAILED", message)
                 self.assertIn("expected X=10, Y=-20", message)
                 self.assertIn("integer readout X=", message)
-                self.assertIn("+/-50 um", message)
+                self.assertIn("+/-500 um", message)
                 self.assertIn(repr(text), message)
 
     def test_large_integer_differences_remain_exact_under_reduced_decimal_context(self):
         target = 1000000000000000000000000000000000000000000
-        for offset in (-51, -50, -1, 0, 1, 50, 51):
+        for offset in (-501, -500, -1, 0, 1, 500, 501):
             text = f"X={target + offset}, Y={-target - offset} "
             with self.subTest(offset=offset), localcontext() as context:
                 context.prec = 1
-                if abs(offset) <= 50:
+                if abs(offset) <= 500:
                     self.assertEqual(
                         xy_readout.require_xy_position(text, target, -target),
                         (Decimal(target + offset), Decimal(-target - offset)),

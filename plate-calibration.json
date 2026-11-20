@@ -1,0 +1,130 @@
+{
+  "version": 2,
+  "model": "similarity_2d",
+  "units": "um",
+  "spacing_um": 28489.0,
+  "scale": 1.0156429304524346,
+  "rotation_matrix": [
+    [
+      0.999993729122338,
+      -0.003541428525325231
+    ],
+    [
+      0.003541428525325231,
+      0.999993729122338
+    ]
+  ],
+  "translation_um": [
+    -3800.3499999999985,
+    -1354.699999999997
+  ],
+  "transform_matrix": [
+    [
+      1.0156365614798695,
+      -0.0035968268454491617,
+      -3800.3499999999985
+    ],
+    [
+      0.0035968268454491617,
+      1.0156365614798695,
+      -1354.699999999997
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "calibration_points": [
+    {
+      "role": "calibration",
+      "row": 0,
+      "col": 0,
+      "nominal_xy_um": [
+        -71222.5,
+        71222.5
+      ],
+      "commanded_xy_um": [
+        -71222,
+        71222
+      ],
+      "starting_coordinates_confirmed_by_operator": true,
+      "located_xy_um": [
+        -76392.7,
+        70725.3
+      ],
+      "measurement_source": "Manual transcription of final Stage readout in supplied screenshot",
+      "source_image": "C:\\Users\\joshd\\OneDrive\\Pictures\\Screenshots\\Screenshot 2026-11-20 114714.png",
+      "display_text": "X=-76392.7, Y=70725.3 \u00b5m",
+      "fit_predicted_xy_um": [
+        -76392.70000000001,
+        70725.3
+      ],
+      "fit_error_xy_um": [
+        1.4551915228366852e-11,
+        0.0
+      ],
+      "fit_error_distance_um": 1.4551915228366852e-11
+    },
+    {
+      "role": "calibration",
+      "row": 5,
+      "col": 5,
+      "nominal_xy_um": [
+        71222.5,
+        -71222.5
+      ],
+      "commanded_xy_um": [
+        71222,
+        -71222
+      ],
+      "starting_coordinates_confirmed_by_operator": true,
+      "located_xy_um": [
+        68792.0,
+        -73434.7
+      ],
+      "measurement_source": "Manual transcription of final Stage readout in supplied screenshot",
+      "source_image": "C:\\Users\\joshd\\OneDrive\\Pictures\\Screenshots\\Screenshot 2026-11-20 121243.png",
+      "display_text": "X=68792, Y=-73434.7 \u00b5m",
+      "fit_predicted_xy_um": [
+        68792.0,
+        -73434.7
+      ],
+      "fit_error_xy_um": [
+        0.0,
+        0.0
+      ],
+      "fit_error_distance_um": 0.0
+    }
+  ],
+  "validation": null,
+  "saved_utc": "2026-11-20T17:23:46+00:00",
+  "status": "awaiting_third_corner_validation",
+  "coordinate_frame": "Same unchanged stage frame for both manually measured centers; operator reported center-find coordinate zeroing disabled.",
+  "fit_diagnostics": {
+    "rotation_degrees": 0.20290933208841802,
+    "nominal_baseline_um": 201447.6508922355,
+    "measured_baseline_um": 204598.88248494908,
+    "baseline_error_before_scale_um": 3151.231592713564,
+    "scale_applied": true,
+    "scaled_baseline_error_um": 0.0,
+    "maximum_calibration_point_error_um": 1.4551915228366852e-11,
+    "note": "Operator approved uniform scale for the printed jig. The two points determine translation, rotation, and a common scale. Exact agreement at these fitted points is not independent validation; a third corner has not yet been measured. Separate X/Y scaling, shear, and individual disk offsets are not determined by two points."
+  },
+  "validation_target": {
+    "row": 0,
+    "col": 5,
+    "nominal_xy_um": [
+      -71222.5,
+      -71222.5
+    ],
+    "predicted_xy_um": [
+      -75880.35,
+      -73947.05
+    ],
+    "rounded_machine_command_xy_um": [
+      -75880,
+      -73947
+    ]
+  }
+}
