@@ -20,7 +20,9 @@ Tell your AI to follow the instructions in [install.md](install.md)
    `start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir=C:\crd-data-dir`
 2. Log into Dirty Miles' Googlely account
 3. Goto Chrome Remote Desktop and connect to the machine in the clean room.
-4. Make sure that sleep is disabled! A full 36 disk cycle takes about 12 hours and you will be sad if the machine falls asleep in the middle.
+4. Make sure remote desktop is set to tabs for the multiple screens. We need those tabs to push the window down so everything lines up.
+5. Make sure you are on the tab for Right screen on the laserwirer (the one with the controls).
+6. Make sure that sleep is disabled! A full 36 disk cycle takes about 12 hours and you will be sad if the machine falls asleep in the middle.
 
 ## On laserWriter machine
 
@@ -33,19 +35,31 @@ Do these before starting the script
 * Check that the Control tabs are Job, Execute a Global Alignment, and Aligments just like this...
     ![alt text](image-4.png)
 * Set up the global alignment panel to option P1
-* In the FindWaferCenterOptical panel, make sure `Set Zero` is `Flase`...
+* Select `Find wafer center optical` for alignment. In the FindWaferCenterOptical panel, make sure `Set Zero` is `False`...
     ![alt text](image-5.png)
 * Check Reset Offset and Reset Rotation beside CENTER for calibrated moves.
 * Make sure the right job is loaded on the Jobs tab (currently `zzzzzzzpfstandardraster1103`)
 
+If you use an older saved layout, match its reference screenshot. The earlier
+layout had Configuration, Write Mode, and Automation stacked three levels tall
+and the tabs in the order Execute a Global Alignment, Alignments, Job.
 
 # Start Script
 
+Verify the upper left corner of the Chrome debug instance looks like this:
+<img width="1952" height="806" alt="image" src="https://github.com/user-attachments/assets/3260af94-df18-40ca-9ffe-3445f67d7b2e" />
+
+
+Then run:
 `python real-dwl.py`
 
 The script starts in single step mode so you have to click next for each step.
 
 Once you feel confident that it is working, then you can click the button to run continuously. It will sound an alarm and stop if any tests fail.
+
+If it says you should resize the window, let it.
+
+If things do not line up right, maybe someone resized the panels in C# Menu. You can close them all and then reopen them from the top menu bar. You might also have to drag them to the button in the center of the panel (it appears while dragging a window) to snap them back to default size.
 
 # Coordinate System
 
