@@ -58,19 +58,20 @@ The [run list](run-list.txt) sets the order of the disks. It ships with all
 records each disk in `skip-list.txt` when it sends the final exposure
 confirmation.
 
-If `plate-calibration.json` is missing, the script exposes the two farthest-apart
-pending disks first. It finds their centers optically and saves their measured
-stage coordinates before setting each disk's job origin. After both exposures
-finish, the script saves the calibration and uses it for the remaining disks in
-run-list order. With a valid calibration already present, it starts directly in
-run-list order. [Automatic calibration and restart details](install.md#automatic-plate-calibration)
+For a newly loaded carrier, stop the previous run and use these commands in order
+from the repository folder.
 
-- **For a newly loaded carrier**, stop the previous run and run `.\new-batch.bat`
-  from the repository folder. It deletes `skip-list.txt` and
-  `plate-calibration.json`. Then run `python real-dwl.py` to start the batch
-  and calibrate for the new placement.
-- **To resume with the same carrier still seated**, run `python real-dwl.py`
-  directly. It uses the saved batch progress and calibration.
+1. `.\new-batch.bat` clears the previous exposure record and calibration.
+2. `.\calibrate.bat` optically centers three disks without exposing them. It
+   fits the two farthest-apart centers and checks a third disk independently.
+   A radial error of **500 µm or less** passes. A successful calibration saves
+   `plate-calibration.json` and prints pitch, stage offsets, rotation and check error.
+3. `.\run.bat` exposes the pending disks in run-list order using that calibration.
+
+To resume on the same seated carrier with a validated calibration, use
+`.\run.bat`. If you have a calibration from the earlier two-disk workflow,
+run `.\calibrate.bat` once and keep the existing exposure record.
+[Calibration and disk selection](install.md#calibrate-the-carrier)
 
 If you're continuing a batch begun with the old hardcoded skip list, enter
 the already-started disks in `skip-list.txt` before launching the updated
@@ -92,7 +93,7 @@ For each pending `(r,c)` in the run list, the script calculates the stage target
 Row 0 is closest to the machine door. Column 0 is on the left when facing the machine.
 
 ```python
-spacing, plate_to_stage = load_plate_calibration("plate-calibration.json")
+spacing, plate_to_stage = load_validated_plate_calibration("plate-calibration.json")
 local_xy = plate_position(r, c, spacing)
 stage_x, stage_y = plate_to_stage.apply(local_xy)
 xpos, ypos = str(round(stage_x)), str(round(stage_y))
@@ -103,6 +104,4 @@ xpos, ypos = str(round(stage_x)), str(round(stage_y))
 
 For a calibrated move, production verifies the position, focuses once, then
 clicks Set zero at the disk center and checks the X/Y readout before exposure.
-For a disk used to measure the calibration, it also refocuses after optical
-center finding.
 

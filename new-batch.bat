@@ -6,7 +6,7 @@ if not "%~1"=="" (
 )
 
 set "DWL_BATCH_DIR=%~dp0"
-rem Hold the skip list open while resetting. An active real-dwl run prevents this open.
+rem Calibration and production both hold the skip list open while running.
 rem Delete the calibration first so a failed deletion preserves the old exposure record.
 powershell.exe -NoProfile -NonInteractive -Command ^
     "$ErrorActionPreference = 'Stop';" ^
@@ -21,5 +21,5 @@ powershell.exe -NoProfile -NonInteractive -Command ^
     "} catch { [Console]::Error.WriteLine('Batch reset failed: ' + $_.Exception.GetBaseException().Message); exit 1 }"
 if errorlevel 1 exit /b 1
 
-echo New batch ready. The next real-dwl.py run will calibrate the loaded carrier.
+echo New batch ready. Run calibrate.bat for this carrier, then run.bat to expose.
 exit /b 0

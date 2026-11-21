@@ -47,6 +47,16 @@ class BatchStateTests(unittest.TestCase):
                 pass
         self.assertEqual(self.skip_file.read_bytes(), prefix + b"\n(0,0)\n")
 
+    def test_old_calibration_comments_are_preserved_and_exposed_disks_remain_skipped(self):
+        previous = b'# auto-calibration {"anchors":[]}\n(5,5)\n'
+        self.skip_file.write_bytes(previous)
+        with self.batch() as batch:
+            self.assertEqual(batch.positions, ((5, 5), (1, 3), (0, 0)))
+            self.assertEqual(batch.pending, ((1, 3), (0, 0)))
+            with batch.starting_exposure((0, 0)):
+                pass
+        self.assertEqual(self.skip_file.read_bytes(), previous + b"(0,0)\n")
+
     def test_stop_during_click_preserves_explicit_resolution(self):
         with self.batch() as batch:
             with batch.starting_exposure((5, 5)):

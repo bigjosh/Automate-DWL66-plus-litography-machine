@@ -44,6 +44,7 @@ class NewBatchTests(unittest.TestCase):
         for _ in range(2):
             result = self.launch()
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("calibrate.bat", result.stdout)
             self.assertFalse(self.skip.exists())
             self.assertFalse(self.calibration.exists())
             self.assertEqual(self.run_list.read_bytes(), b"(0,0)\n(0,1)\n")

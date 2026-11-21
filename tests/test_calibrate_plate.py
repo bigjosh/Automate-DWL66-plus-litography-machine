@@ -8,12 +8,14 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+from plate_transform import SimilarityTransform
 from xy_readout import ReadoutError
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "calibrate-plate.py"
+DISKS = ((0, 0), (5, 5), (0, 5))
 
 
 def load_script():
@@ -49,7 +51,7 @@ class FakeMachine:
     CLICK_POINTS = {
         "global-alignment-tab", "move-absolute", "focus-button", "alignment-tab",
         "near-execute", "alignment-execute", "pre-click-alignment-confirm",
-        "click-alignment-confirm", "laser-up-click",
+        "click-alignment-confirm", "laser-up-click", "center-button",
     }
 
     def __init__(self, *, third_error=(12.3, -4.5), spacing=28489.0, scale=1.0,
@@ -58,7 +60,7 @@ class FakeMachine:
         self.moves = []
         self.messages = []
         self.centers = [transformed(nominal(r, c, spacing), scale=scale)
-                        for r, c in ((0, 0), (5, 5), (0, 5))]
+                        for r, c in DISKS]
         self.centers[2] = tuple(a + b for a, b in zip(self.centers[2], third_error))
         self.fail_verify = fail_verify
         self.bad_reads = bad_reads or {}
@@ -116,7 +118,11 @@ class FakeMachine:
         if name not in self.CLICK_POINTS:
             raise AssertionError(f"Unapproved machine action: {name}")
         self.events.append(("click", name))
-        if name == "move-absolute":
+        if name == "center-button":
+            if not self.head_up_verified or ("verify", "center-reset-options", 1) not in self.events:
+                raise AssertionError("CENTER requires retracted head and checked reset options")
+            self.read_phase = "frame"
+        elif name == "move-absolute":
             if not self.head_up or not self.head_up_verified:
                 raise AssertionError("Cross-disk travel before verified head raise")
             if set(self.pending_coordinates) != {"x", "y"}:
@@ -141,15 +147,22 @@ class FakeMachine:
     def wait(self, seconds):
         self.events.append(("wait", seconds))
 
-    def grabOCRTextLine(self, name, *, tesseract_cmd, review, validator, retrycount, delay, margin):
+    def grabOCRTextLine(self, name, *, tesseract_cmd, review, validator, retrycount, delay, margin,
+                        initial_delay=None):
         if name != "actual-xy" or not review or not callable(validator):
             raise AssertionError("Calibration readbacks must use reviewed, validated actual-xy OCR")
+        if self.read_phase == "frame":
+            text = "X=0, Y=0 um"
+            validator(text, margin)
+            self.read_phase = None
+            return text
         if self.read_phase not in ("move", "center"):
             raise AssertionError("OCR requires a pending move or completed center find")
         phase = self.read_phase
-        if (retrycount, delay, margin) != (5, 5, 50 if phase == "move" else self.spacing / 2):
-            raise AssertionError("Unexpected retry settings or default margin for this calibration read")
         index = len(self.moves) - 1
+        center_margin = self.spacing / 2 if index < 2 else None
+        if (retrycount, delay, margin) != (5, 5, 50 if phase == "move" else center_margin):
+            raise AssertionError("Unexpected retry settings or default margin for this calibration read")
         if phase == "move":
             delta = self.move_errors.get(index, (0, 0))
             position = tuple(a + b for a, b in zip(self.moves[index], delta))
@@ -160,7 +173,10 @@ class FakeMachine:
         text = self.bad_reads.get((phase, index),
                                   f"X={position[0]:.6f}, Y={position[1]:.6f} um")
         self.events.append(("read", phase, index, text))
-        validator(text, self.margin_changes.get((phase, index), float(margin)))
+        if margin is None:
+            validator(text)
+        else:
+            validator(text, self.margin_changes.get((phase, index), float(margin)))
         if phase == "move":
             self.move_read_ok = True
         self.read_phase = None
@@ -179,10 +195,87 @@ class CalibrationWorkflowTests(unittest.TestCase):
 
     def run_calibration(self, machine, **kwargs):
         return self.tester.run_calibration(
-            machine, tesseract_cmd="fake-tesseract", output_dir=self.output_dir, **kwargs)
+            machine, disks=DISKS, tesseract_cmd="fake-tesseract", output_dir=self.output_dir, **kwargs)
 
     def saved_report(self):
         return json.loads((self.output_dir / "result.json").read_text(encoding="utf-8"))
+
+    def test_farthest_pair_and_most_perpendicular_disk_follow_run_order(self):
+        all_disks = [(r, c) for r in range(6) for c in range(6)]
+        self.assertEqual(self.tester.select_disks(all_disks), DISKS)
+        self.assertEqual(self.tester.select_disks(all_disks[::-1]), ((5, 5), (0, 0), (5, 0)))
+        subset = [(1, 4), (2, 2), (3, 3), (4, 4), (0, 0), (3, 1)]
+        self.assertEqual(self.tester.select_disks(subset), ((4, 4), (0, 0), (1, 4)))
+
+    def test_invalid_run_geometry_prevents_connection_and_preserves_previous_file(self):
+        folder = Path(self.temp.name)
+        run, skip, active = [folder / name for name in ("run.txt", "skip.txt", "active.json")]
+        active.write_bytes(b"prior calibration")
+        skip.write_bytes(b"# operator notes\n")
+        for lines in ("(0,1)\n(2,2)", "(0,0)\n(1,1)\n(3,3)"):
+            with self.subTest(lines=lines):
+                run.write_text(lines, encoding="utf-8")
+                with patch.object(self.tester, "TesseractReader") as reader, self.assertRaisesRegex(
+                        ValueError, "collinear"):
+                    self.tester.main(["--run-list", str(run), "--skip-list", str(skip),
+                                      "--transform-file", str(active), "--output-dir", str(self.output_dir)])
+                reader.assert_not_called()
+                self.assertEqual(active.read_bytes(), b"prior calibration")
+                self.assertEqual(skip.read_bytes(), b"# operator notes\n")
+                self.assertFalse(self.output_dir.exists())
+
+    def test_cli_uses_full_run_list_and_forwards_published_file_to_stats(self):
+        folder = Path(self.temp.name)
+        run, skip, active = [folder / name for name in ("run.txt", "skip.txt", "custom.json")]
+        run.write_text("(1,4)\n(4,4)\n(0,0)\n(2,2)\n", encoding="utf-8")
+        skip.write_bytes(b"(1,4)\n(4,4)\n")
+        machine = Mock()
+        with (patch.dict(sys.modules, {"playwrightscriptlib": machine}),
+              patch.object(self.tester, "TesseractReader"),
+              patch.object(self.tester, "run_calibration") as calibrate,
+              patch.object(self.tester.subprocess, "run") as stats):
+            stats.return_value.returncode = 7
+            result = self.tester.main(["--run-list", str(run), "--skip-list", str(skip),
+                                       "--transform-file", str(active), "--output-dir", str(self.output_dir)])
+        self.assertEqual(calibrate.call_args.kwargs["disks"], ((4, 4), (0, 0), (1, 4)))
+        self.assertEqual(result, 7)
+        stats.assert_called_once_with([sys.executable, str(SCRIPT.with_name("calibrate-stats.py")), str(active)])
+        machine.disconnect.assert_called_once()
+        self.assertEqual(skip.read_bytes(), b"(1,4)\n(4,4)\n")
+
+    def test_held_out_error_uses_radial_limit_and_failed_recalibration_retires_old_file(self):
+        machine = FakeMachine(third_error=(400, 400))
+        active = Path(self.temp.name) / "active.json"
+        active.write_bytes(b"previous calibration")
+        with self.assertRaisesRegex(ValueError, r"center error .* exceeds 500 um"):
+            self.run_calibration(machine, transform_file=active)
+        self.assertEqual(self.saved_report()["status"], "stopped")
+        self.assertAlmostEqual(self.saved_report()["validation"]["error_distance_um"],
+                               math.hypot(400, 400), places=5)
+        self.assertTrue(machine.head_up_verified)
+        self.assertFalse(active.exists())
+        self.assertEqual((self.output_dir / self.tester.BACKUP).read_bytes(), b"previous calibration")
+
+    def test_exact_radial_limit_from_unrounded_prediction_passes(self):
+        machine = FakeMachine()
+        machine.centers = [nominal(*disk) for disk in DISKS]
+        x, y = machine.centers[2]
+        machine.centers[2] = (x - 300, y - 400)
+        report = self.run_calibration(machine)
+        self.assertEqual(report["validation"]["error_distance_um"], 500.0)
+        self.assertTrue((self.output_dir / "plate-calibration.json").exists())
+
+    def test_reserved_artifact_names_are_rejected_before_machine_actions(self):
+        for name in ("result.json", self.tester.CANDIDATE, self.tester.BACKUP):
+            with self.subTest(name=name):
+                machine = FakeMachine()
+                with self.assertRaisesRegex(ValueError, "separate from"):
+                    self.run_calibration(machine, transform_file=self.output_dir / name)
+                self.assertFalse(machine.events)
+        with self.assertRaisesRegex(ValueError, "Run and skip lists"):
+            self.tester.main(["--run-list", str(self.output_dir / "run.log"),
+                              "--output-dir", str(self.output_dir)])
+        self.assertFalse(self.output_dir.exists())
 
     def test_two_corner_fit_predicts_third_and_reports_independent_error(self):
         machine = FakeMachine()
@@ -306,7 +399,7 @@ class CalibrationWorkflowTests(unittest.TestCase):
         self.assertEqual(len(machine.moves), 1)
 
     def test_partial_measurement_survives_failed_head_raise(self):
-        machine = FakeMachine(fail_verify=("z-zero", 2))
+        machine = FakeMachine(fail_verify=("z-zero", 3))
         with self.assertRaises(RuntimeError):
             self.run_calibration(machine)
         report = self.saved_report()
@@ -315,38 +408,42 @@ class CalibrationWorkflowTests(unittest.TestCase):
         self.assertEqual(len(machine.moves), 1)
 
     def test_final_head_raise_must_pass_before_report_is_complete(self):
-        # Each disk has a pre-travel check and a post-measurement raise check.
-        machine = FakeMachine(fail_verify=("z-zero", 6))
+        # CENTER is also checked before the three move-and-raise pairs.
+        machine = FakeMachine(fail_verify=("z-zero", 7))
         with self.assertRaises(RuntimeError):
             self.run_calibration(machine)
         report = self.saved_report()
         self.assertNotEqual(report["status"], "complete")
         self.assertEqual(len(report["measurements"]), 3)
         self.assertEqual(len(machine.moves), 3)
+        self.assertFalse((self.output_dir / "plate-calibration.json").exists())
 
-    def test_third_move_uses_reloaded_transform_not_the_in_memory_fit(self):
+    def test_third_prediction_uses_loaded_candidate_with_active_path_still_absent(self):
         machine = FakeMachine()
-        original_loader = self.tester.load_calibration
-        transform_file = self.output_dir / "reusable-transform.json"
+        original_loader = self.tester.load_plate_calibration
+        original_apply = SimilarityTransform.apply
+        candidates = []
+        active = self.output_dir / "reusable-transform.json"
 
-        def load_shifted(path):
-            loaded = original_loader(path)
-            # The loader's result deliberately differs from the fitted object.
-            # This proves the validation move consumes the freshly loaded result.
-            return type(loaded)(loaded.cos_theta, loaded.sin_theta,
-                                loaded.tx + 100, loaded.ty, loaded.scale)
+        def load_candidate(path):
+            self.assertFalse(active.exists())
+            spacing, loaded = original_loader(path)
+            candidates.append(loaded)
+            return spacing, loaded
 
-        with patch.object(self.tester, "load_calibration", side_effect=load_shifted) as loader:
-            report = self.run_calibration(machine, transform_file=transform_file)
+        with (patch.object(self.tester, "load_plate_calibration", side_effect=load_candidate) as loader,
+              patch.object(SimilarityTransform, "apply", autospec=True, side_effect=original_apply) as apply):
+            report = self.run_calibration(machine, transform_file=active)
 
-        loader.assert_called_once_with(transform_file.resolve())
-        expected = transformed(nominal(0, 5))
-        self.assertEqual(machine.moves[2], (round(expected[0] + 100), round(expected[1])))
-        self.assertAlmostEqual(report["validation"]["error_x_um"], -87.7, places=5)
+        loader.assert_called_once_with(self.output_dir / self.tester.CANDIDATE)
+        self.assertTrue(any(call.args[0] is candidates[0] and call.args[1] == nominal(0, 5)
+                            for call in apply.call_args_list))
+        self.assertEqual(machine.moves[2], tuple(round(v) for v in transformed(nominal(0, 5))))
+        self.assertAlmostEqual(report["validation"]["error_x_um"], 12.3, places=5)
 
     def test_unreadable_saved_transform_stops_before_third_move(self):
         machine = FakeMachine()
-        with patch.object(self.tester, "load_calibration", side_effect=ValueError("Bad transform")):
+        with patch.object(self.tester, "load_plate_calibration", side_effect=ValueError("Bad transform")):
             with self.assertRaisesRegex(ValueError, "Bad transform"):
                 self.run_calibration(machine)
         self.assertEqual(len(machine.moves), 2)
@@ -365,7 +462,7 @@ class CalibrationWorkflowTests(unittest.TestCase):
         self.assertEqual([(p["row"], p["col"]) for p in saved["calibration_points"]],
                          [(0, 0), (5, 5)])
         self.assertEqual(saved["validation"], json.loads(json.dumps(report["validation"])))
-        loaded = self.tester.load_calibration(transform_file)
+        loaded = self.tester.load_plate_calibration(transform_file)[1]
         for actual, expected in zip(loaded.apply(nominal(0, 5)),
                                     report["validation"]["expected_xy_um"]):
             self.assertAlmostEqual(actual, expected, places=10)
@@ -378,7 +475,7 @@ class CalibrationWorkflowTests(unittest.TestCase):
         self.assertEqual(machine.moves[2], tuple(round(v) for v in expected))
         self.assertAlmostEqual(report["validation"]["error_x_um"], 12.3, places=5)
         self.assertAlmostEqual(report["validation"]["error_y_um"], -4.5, places=5)
-        loaded = self.tester.load_calibration(self.output_dir / "plate-calibration.json")
+        loaded = self.tester.load_plate_calibration(self.output_dir / "plate-calibration.json")[1]
         for record in report["measurements"][:2]:
             self.assertLess(math.dist(loaded.apply(record["nominal_xy_um"]),
                                       record["located_xy_um"]), 1e-7)
@@ -386,30 +483,31 @@ class CalibrationWorkflowTests(unittest.TestCase):
             for actual, expected_value in zip(row, expected_row):
                 self.assertAlmostEqual(actual, expected_value, places=10)
 
-    def test_third_move_consumes_scale_from_saved_file(self):
-        machine = FakeMachine(scale=1.0156)
-        original_loader = self.tester.load_calibration
+    def test_altered_candidate_spacing_or_transform_blocks_validation_move(self):
+        original_loader = self.tester.load_plate_calibration
+        for field in ("scale", "spacing_um"):
+            with self.subTest(field=field):
+                machine = FakeMachine(scale=1.0156)
+                self.output_dir = Path(self.temp.name) / field
 
-        def change_saved_scale(path):
-            loaded = original_loader(path)
-            changed = type(loaded)(loaded.cos_theta, loaded.sin_theta,
-                                   loaded.tx, loaded.ty, loaded.scale * 1.01)
-            document = json.loads(Path(path).read_text(encoding="utf-8"))
-            self.tester.save_calibration(
-                path, changed, spacing=document["spacing_um"],
-                calibration_points=document["calibration_points"])
-            return original_loader(path)
+                def change_saved_candidate(path):
+                    spacing, loaded = original_loader(path)
+                    if field == "spacing_um":
+                        spacing *= 1.01
+                    else:
+                        loaded = SimilarityTransform(loaded.cos_theta, loaded.sin_theta,
+                                                     loaded.tx, loaded.ty, loaded.scale * 1.01)
+                    document = json.loads(Path(path).read_text(encoding="utf-8"))
+                    self.tester.save_calibration(path, loaded, spacing=spacing,
+                                                 calibration_points=document["calibration_points"])
+                    return original_loader(path)
 
-        with patch.object(self.tester, "load_calibration", side_effect=change_saved_scale):
-            report = self.run_calibration(machine)
-        expected = transformed(nominal(0, 5), scale=1.0156 * 1.01)
-        self.assertEqual(machine.moves[2], tuple(round(v) for v in expected))
-        for axis, key in enumerate(("error_x_um", "error_y_um")):
-            self.assertAlmostEqual(report["validation"][key],
-                                   machine.centers[2][axis] - expected[axis], places=5)
-        loaded = original_loader(self.output_dir / "plate-calibration.json")
-        self.assertAlmostEqual(loaded.scale, 1.0156 * 1.01, places=10)
-
+                with (patch.object(self.tester, "load_plate_calibration", side_effect=change_saved_candidate),
+                      self.assertRaisesRegex(ValueError, "differs from the measured")):
+                    self.run_calibration(machine)
+                self.assertEqual(len(machine.moves), 2)
+                self.assertTrue(machine.head_up_verified)
+                self.assertFalse((self.output_dir / "plate-calibration.json").exists())
 
 if __name__ == "__main__":
     unittest.main()

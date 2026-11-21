@@ -4,17 +4,28 @@ from decimal import Decimal
 import math
 from pathlib import Path
 
-from xy_readout import ReadoutError, parse_xy
+from xy_readout import (POSITION_TOLERANCE_UM, ReadoutError, parse_xy,
+                        parse_xy_integers, require_xy_position)
 
 
 LAYOUT_DIR = Path(__file__).resolve().parent / "layout"
 MOVE_TOLERANCE_UM = 50
+CLICK_SETTLE_SECONDS = 1
 
 
-def check_frame(psl, name, match_level, *, required=True, **options):
+def configure_machine_screen(psl, crd_popup_screenshot=None):
+    """Bind the connected browser to the recorded DWL layout and input guards."""
+    psl.loadLayout(LAYOUT_DIR)
+    psl.checkViewport()
+    psl.enableClickGuard("crd-popup", timeout=30, referenceScreenshot=crd_popup_screenshot)
+    psl.clicksSettleTime(CLICK_SETTLE_SECONDS)
+    psl.pauseOnInfo(True)
+
+
+def check_frame(psl, name, match_level, **options):
     psl.info(f"Check {name}")
     matched = psl.verifyFrame(name, matchLevel=match_level, **options)
-    if required and matched is not True:
+    if matched is not True:
         raise RuntimeError(f"Required check {name!r} was skipped or aborted.")
 
 
@@ -23,13 +34,36 @@ def click(psl, name, message=None, *, double=False):
     (psl.doubleClick if double else psl.click)(name)
 
 
-def send_absolute_move(psl, command, *, require_match=True):
+def check_stage_position(psl, expected, tesseract_cmd, description="X/Y PASS", *, initial_delay=None):
+    """Verify the displayed integer coordinates against the requested stage position."""
+    x, y = expected
+    text = psl.grabOCRTextLine(
+        "actual-xy", tesseract_cmd=tesseract_cmd, review=True, retrycount=5, delay=5,
+        initial_delay=initial_delay, margin=POSITION_TOLERANCE_UM,
+        validator=lambda text, margin: require_xy_position(text, x, y, tolerance=margin))
+    actual_x, actual_y = parse_xy_integers(text)
+    psl.info(f"{description}: OCR={text!r}; integer readout X={actual_x}, Y={actual_y} um; "
+             f"expected X={x}, Y={y} um")
+
+
+def restore_stage_frame(psl, tesseract_cmd):
+    """Restore and verify the stage coordinate frame in which calibration is measured."""
+    check_frame(psl, "z-zero", 0.999)
+    check_frame(psl, "z-zero-check", 0.99)
+    check_frame(psl, "center-reset-options", 1.0,
+                message="Expected both CENTER reset options to be checked")
+    click(psl, "center-button")
+    psl.wait(5)
+    check_stage_position(psl, (0, 0), tesseract_cmd)
+
+
+def send_absolute_move(psl, command):
     """Enter a rounded X/Y command, send the move, and wait for it to settle."""
     x, y = command
     click(psl, "global-alignment-tab")
     psl.wait(1)
     for axis, value in (("x", x), ("y", y)):
-        check_frame(psl, f"check{axis}-field-label", 0.99, required=require_match)
+        check_frame(psl, f"check{axis}-field-label", 0.99)
         click(psl, f"{axis}-field", double=True)
         psl.info(f"Type {axis.upper()}={value} um")
         psl.sendkeys(str(value))
@@ -42,6 +76,11 @@ def focus(psl, message="Focus on this disk"):
     psl.wait(5)
     check_frame(psl, "focus-executing", 0.96, delay=10, retrycount=24)
     check_frame(psl, "focus-ready", 0.96, delay=10, retrycount=24)
+
+
+def raise_head(psl, message="Raise the head after measuring this disk"):
+    click(psl, "laser-up-click", message)
+    check_frame(psl, "z-zero", 0.999, delay=10, retrycount=78)
 
 
 def optical_center_find(psl):

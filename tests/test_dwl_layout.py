@@ -29,6 +29,11 @@ class StandaloneLayoutTests(unittest.TestCase):
                     browser = Mock()
                     browser.loadLayout.side_effect = SystemExit("layout reached")
                     argv = [str(script), "--output-dir", folder]
+                    if filename == "calibrate-plate.py":
+                        run_list = Path(folder) / "run-list.txt"
+                        run_list.write_text("(0,0)\n(5,5)\n(0,5)\n", encoding="utf-8")
+                        argv += ["--run-list", str(run_list), "--skip-list", str(run_list.with_name("skip.txt")),
+                                 "--transform-file", str(run_list.with_name("calibration.json"))]
                     with (
                         patch.dict(sys.modules, {"playwrightscriptlib": browser}),
                         patch.object(sys, "argv", argv),

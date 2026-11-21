@@ -28,7 +28,7 @@ class FakePSL(ModuleType):
     """Only explicitly defined methods are available; none has live effects."""
 
     def __init__(self, read_results=None, *, center_read_results=None,
-                 zero_read_results=None, optical_results=None, skip_check=None, margin_changes=None,
+                 zero_read_results=None, skip_check=None, margin_changes=None,
                  click_mismatch=None):
         super().__init__("playwrightscriptlib")
         self.events = []
@@ -37,7 +37,6 @@ class FakePSL(ModuleType):
         self.center_reads = []
         self.move_reads = []
         self.zero_reads = []
-        self.optical_reads = []
         self.pending = {}
         self.pending_read = None
         self.click_point = None
@@ -46,7 +45,6 @@ class FakePSL(ModuleType):
         self.read_results = read_results or {}
         self.center_read_results = center_read_results or {}
         self.zero_read_results = zero_read_results or {}
-        self.optical_results = optical_results or {}
         self.margin_changes = margin_changes or {}
         self.skip_check = skip_check
         self.click_mismatch = click_mismatch
@@ -123,7 +121,7 @@ class FakePSL(ModuleType):
         elif name == "set-zero-button":
             self.pending_read = ("zero", 0, 0)
         elif name == "click-alignment-confirm":
-            self.pending_read = ("optical", *self.moves[-1])
+            raise AssertionError("Production must never run an optical center find")
         elif name == "move-absolute":
             if set(self.pending) != {"x", "y"}:
                 raise AssertionError("Both coordinates must be typed before each move")
@@ -142,15 +140,13 @@ class FakePSL(ModuleType):
         if self.pending_read is None:
             raise AssertionError("OCR read requires a fresh move, center find, CENTER or Set zero")
         phase, x, y = self.pending_read
-        expected_margin = 28489 / 2 if phase == "optical" else 500
-        if (retrycount, delay, margin) != (5, 5, expected_margin):
+        if (retrycount, delay, margin) != (5, 5, 500):
             raise AssertionError(f"Unexpected OCR options for {phase}: {(retrycount, delay, margin)}")
         self.pending_read = None
         phase_reads, results = {
             "center": (self.center_reads, self.center_read_results),
             "move": (self.move_reads, self.read_results),
             "zero": (self.zero_reads, self.zero_read_results),
-            "optical": (self.optical_reads, self.optical_results),
         }[phase]
         index = len(phase_reads)
         self.reads.append((name, tesseract_cmd))
@@ -169,7 +165,7 @@ class FakePSL(ModuleType):
         return result
 
 
-class SimulatedBatchTest(unittest.TestCase):
+class RealDWLXYGateTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -179,9 +175,21 @@ class SimulatedBatchTest(unittest.TestCase):
         self.positions = [(5, 0), (0, 1), (2, 4)]
         self.run_list.write_text("".join(f"({r},{c})\n" for r, c in self.positions),
                                  encoding="utf-8")
+        self.save_verified_calibration(plate_transform.RigidTransform(1, 0, 0, 0), 28489)
+        self.reference = FakePSL()
+        self.config = self.run_script(self.reference)
+
+    def save_verified_calibration(self, transform, spacing):
+        anchors = []
+        for row, col in ((0, 0), (5, 5)):
+            nominal = plate_transform.plate_position(row, col, spacing)
+            anchors.append(dict(row=row, col=col, nominal_xy_um=nominal,
+                                located_xy_um=transform.apply(nominal)))
+        check_xy = transform.apply(plate_transform.plate_position(0, 5, spacing))
         plate_transform.save_calibration(
-            self.calibration, plate_transform.RigidTransform(1, 0, 0, 0),
-            spacing=28489, calibration_points=[{'row': 0, 'col': 0}, {'row': 5, 'col': 5}])
+            self.calibration, transform, spacing=spacing, calibration_points=anchors,
+            validation=dict(row=0, col=5, expected_xy_um=check_xy, measured_xy_um=check_xy,
+                            error_distance_um=0.0, passed=True))
 
     def run_script(self, fake, *, preflight_error=None, use_default_calibration=False,
                    resume=False, script=SCRIPT):
@@ -217,12 +225,6 @@ class SimulatedBatchTest(unittest.TestCase):
         script.write_text(text, encoding="utf-8")
         return script
 
-
-class RealDWLXYGateTests(SimulatedBatchTest):
-    def setUp(self):
-        super().setUp()
-        self.reference = FakePSL()
-        self.config = self.run_script(self.reference)
 
     def require_cycles(self, minimum=1):
         if len(self.reference.moves) < minimum:
@@ -327,8 +329,8 @@ class RealDWLXYGateTests(SimulatedBatchTest):
     def test_default_calibration_is_loaded_once_from_beside_script(self):
         script = self.calibration.with_name(SCRIPT.name)
         script.write_bytes(SCRIPT.read_bytes())
-        with patch.object(plate_transform, 'load_plate_calibration',
-                          wraps=plate_transform.load_plate_calibration) as load:
+        with patch.object(plate_transform, 'load_validated_plate_calibration',
+                          wraps=plate_transform.load_validated_plate_calibration) as load:
             self.run_script(FakePSL(), script=script, use_default_calibration=True)
         load.assert_called_once_with(self.calibration)
 
@@ -336,9 +338,8 @@ class RealDWLXYGateTests(SimulatedBatchTest):
         # A 90-degree rotation, non-unit scale, fractional offset and odd pitch
         # distinguish a proper calibrated command from early rounding or truncation.
         spacing = 1001
-        plate_transform.save_calibration(
-            self.calibration, plate_transform.SimilarityTransform(0, 1, 13.3, -19.25, 1.25),
-            spacing=spacing, calibration_points=[{'row': 0, 'col': 0}, {'row': 5, 'col': 5}])
+        self.save_verified_calibration(plate_transform.SimilarityTransform(0, 1, 13.3, -19.25, 1.25),
+                                       spacing)
         fake = FakePSL()
         self.run_script(fake)
         enabled = self.positions
@@ -370,6 +371,37 @@ class RealDWLXYGateTests(SimulatedBatchTest):
         self.assertFalse(any(e[0] in {'connect', 'layout', 'click', 'field', 'type', 'read'}
                              for e in fake.events))
         self.assertEqual(self.calibration.read_text(encoding='utf-8'), contents)
+
+    def test_pending_work_requires_a_saved_third_disk_check_before_machine_setup(self):
+        self.calibration.unlink()
+        for error in (FileNotFoundError, ValueError):
+            with self.subTest(error=error):
+                if error is ValueError:
+                    plate_transform.save_calibration(
+                        self.calibration, plate_transform.RigidTransform(1, 0, 0, 0), spacing=28489,
+                        calibration_points=[dict(row=0, col=0), dict(row=5, col=5)])
+                fake = FakePSL()
+                with self.assertRaisesRegex(error, r"calibrate\.bat"):
+                    self.run_script(fake)
+                self.assertTrue(all(event[0] == "info" for event in fake.events))
+                self.assertEqual(self.skip_list.read_bytes(), b"")
+
+    def test_completed_batch_needs_no_calibration_or_machine_connection(self):
+        self.calibration.unlink()
+        fake = FakePSL()
+        self.run_script(fake, resume=True)
+        self.assertTrue(all(event[0] == "info" for event in fake.events))
+
+    def test_skipped_machine_state_stops_before_the_next_action(self):
+        for skipped, blocked in (("z-zero-check", "center-button"),
+                                 ("checkx-field-label", "move-absolute"),
+                                 ("laser-confirm-image", "laser-confirm"),
+                                 ("job-finished", "job-done-confirm")):
+            with self.subTest(skipped=skipped):
+                fake = FakePSL(skip_check=skipped)
+                with self.assertRaisesRegex(RuntimeError, skipped):
+                    self.run_script(fake)
+                self.assertNotIn(("click", blocked), fake.events)
 
     def test_every_unskipped_move_gets_fresh_read_after_wait_before_focus(self):
         self.require_cycles()

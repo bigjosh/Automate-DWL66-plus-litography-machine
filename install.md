@@ -262,18 +262,20 @@ run. Retrying the OCR does not repeat a move, focus, or exposure.
 
 ## Start the production script
 
-For a newly loaded carrier, stop the previous run and execute `.\new-batch.bat`
-from the DWL repository folder. When resuming with the same carrier still
-seated, go directly to the production command.
+For a newly loaded carrier, stop the previous run, execute `.\new-batch.bat`
+from the DWL repository folder, then run `.\calibrate.bat`. After it passes,
+start production with the command below. When resuming the same seated carrier
+with a validated calibration, go directly to this command.
 
 ```powershell
 .\run.bat
 ```
 
 At startup the script uses `plate-calibration.json` beside `real-dwl.py`, or
-the file specified by `--transform-file`. A missing file triggers automatic
-calibration. Each move logs the local and stage targets in µm and rounds the
-stage coordinates to whole µm for Move absolute and its OCR check.
+the file specified by `--transform-file`. Before connecting to write a pending
+disk, it requires a passing independent third-disk check. Each move logs the
+local and stage targets in µm and rounds the stage coordinates to whole µm
+for Move absolute and its OCR check.
 
 If Tesseract is installed in a different location, specify its path with
 `--tesseract-cmd`.
@@ -283,7 +285,8 @@ If Tesseract is installed in a different location, specify its path with
 ```
 
 The script starts in single-step mode. Advance with the operator controls or
-select continuous operation when ready. Logs and screenshots are saved under
+select continuous operation when ready. Skipping or aborting a required frame
+check stops the run. Logs and screenshots are saved under
 `runs\<timestamp>`. The script checks the X/Y integer readouts within ±500 µm
 on each axis after CENTER and after the move. For a calibrated disk it focuses
 once, waits for the executing and ready indicators, clicks **Set zero**, and
@@ -295,36 +298,6 @@ a point inside it.
 The CRD popup guard waits up to 30 seconds before mouse clicks and keyboard
 operations; a persistent popup prevents the pending input and raises an error.
 
-### Automatic plate calibration
-
-Removing and reseating the carrier changes its position relative to the stage.
-Every newly loaded batch needs a fresh calibration for that placement.
-
-Select **Find wafer center optical** with its automatic **Set zero** option
-off. When the selected calibration file is missing, the script chooses the
-two farthest-apart pending disks. Equal distances are resolved in run-list
-order. For a full tray in the default order, the pair is `(0,0)` and `(5,5)`.
-The nominal moves use the tray's 28,489 µm pitch.
-
-For each of these disks the script restores the common stage frame with
-**CENTER**, verifies the nominal move, focuses, and runs the optical center
-find. It saves the measured stage X/Y with decimal precision, refocuses and
-waits for focus-ready, then sets and verifies the job origin before exposure.
-After both exposures have passed the job-finished check, it saves and reloads
-the two-point transform. The remaining disks use calibrated moves and one
-focus each. A single remaining disk is optically centered and exposed without
-creating a two-point calibration. Dry runs keep measurements and the fitted
-transform in memory.
-
-Keep the calibration progress comments in `skip-list.txt` when resuming.
-If the script stopped after an exposure started but before it recorded
-completion for a calibration disk, it asks you to verify completion in the
-machine's job history. Choose **I verified exposure completed** only once
-you have confirmed that disk finished and the machine is ready. **Stop**
-leaves it pending review. Resuming uses the saved center and skips the
-already-started exposure. If an exposure *start* itself is uncertain, follow
-the pending-line instructions below first.
-
 ### Batch tracking and recovery
 
 The default [run-list.txt](run-list.txt) and local `skip-list.txt` live beside
@@ -335,8 +308,8 @@ stopped to change the order or select a subset. Use `--run-list` and
 
 For a **new batch**, stop the previous run and execute `.\new-batch.bat`.
 It deletes `skip-list.txt` and `plate-calibration.json` beside the batch
-file. The next production run uses `run-list.txt` to select the disks for
-fresh calibration and exposure.
+file. Calibrate the newly seated carrier with `.\calibrate.bat`, then start
+exposures with `.\run.bat`.
 
 If you override `--skip-list` or `--transform-file`, select fresh paths for
 the new batch or clear the corresponding files before launch. The reset
@@ -361,73 +334,70 @@ Check the machine's job history for that disk. If exposure started, replace
 the entire line with `(2,3)`. If it definitely did not start, remove the line.
 Keep the rest of the file and resume.
 
-## Test a plate calibration with three corners
+## Calibrate the carrier
 
-Select `Find wafer center optical`. Disable the
-setting that zeros X/Y after center finding, and keep the stage origin and
-rotation unchanged throughout this test. Start with the head raised at Z=0
-and the usual nominal plate coordinate system. The test moves and focuses,
-but does not expose or change the production script.
+Start with the head raised at Z=0. Select **Find wafer center optical**, turn
+off its automatic **Set zero**, and check **Reset Offset** and **Reset Rotation**
+beside **CENTER**. Keep the carrier seated and the same stage coordinate frame
+for calibration and production. Calibration moves, focuses, measures three
+optical centers, and raises the head. It sends no exposure commands.
 
 ```powershell
-.\.venv\Scripts\python.exe calibrate-plate.py
+.\calibrate.bat
 ```
 
 The script starts in single-step mode and retains the click reassignment,
 reference recapture, OCR-area editing, and CRD popup guard. Check the
 `laser-up-click` location when first using the head-raise step if that point
 has not yet been updated for the new screen layout. Every required frame
-check must pass; **Skip and continue** or **Abort verify** stops this test.
+check must pass. **Skip and continue** or **Abort verify** stops calibration.
 
-It visits `(0,0)` and `(5,5)` at their nominal positions, focuses once on each,
-finds each center, and records the displayed coordinates. It fits translation,
-rotation, and uniform scale, allowing the printed jig's actual pitch to differ
-from the nominal 28,489 um spacing. The nominal half-micrometer coordinates
-are retained for the fit; movement commands are
-rounded to whole micrometers. The head is raised and verified between disks.
+1. The script selects the two farthest-apart disks in the calibration run list.
+   It measures them at their nominal grid locations and fits uniform scale,
+   rotation, and translation from their optical centers.
+2. It selects a third disk with the greatest perpendicular distance from the line
+   through the first pair. Ties follow run-list order. On the default tray the
+   fit uses `(0,0)` and `(5,5)`, and the check uses `(0,5)`. Choose at least
+   three noncollinear disks that are physically present. Calibration uses the
+   full supplied run list, including disks already in the exposure skip list.
+3. The script reloads its candidate transform and moves to the predicted third
+   center. It measures that disk independently and compares its actual optical
+   center with the unrounded prediction. **A straight-line error of 500 µm or
+   less passes**, including exactly 500 µm. The head is raised after the
+   measurement. A failed check ends calibration and prevents publication.
 
-After fitting, it writes `plate-calibration.json` beside the script, then
-**reloads that file** to predict and move to `(0,5)`. A final focus and center
-find measures the independent error. The third corner never enters the fit.
-The script reports signed X/Y errors and their combined distance, measured
-minus predicted, and raises the head at completion. It also reports the
-measured-to-nominal baseline ratio used as the scale factor. Both calibration
-points fit exactly by construction; that is not an independent accuracy check.
+On success, `plate-calibration.json` contains the two fit measurements, the
+transform, and the independent measurement and error. The launcher then prints
+the nominal and measured pitch, stage X/Y offsets, rotation in degrees, scale
+and third-disk result. To print the saved statistics again without connecting
+to the machine, run `python calibrate-stats.py`.
 
-The reusable JSON contains a version, units, nominal grid spacing, scale,
-rotation matrix, translation, a complete 3x3 transform matrix, both calibration
-measurements, and the third-corner validation result. New files use version 2
-and model `similarity_2d`. The file has `validation: null` until that measurement
-succeeds. The
-`plate_transform.load_calibration()` helper validates the file and loads its
-transform; it also reads the original version-1 rigid files with scale fixed
-at 1. The version-2 loader rejects missing/invalid scale and inconsistent
-matrices. Production seeks use the plate placement and stage coordinate frame
-in which the centers were measured. Reloading/reseating the plate or changing
-that coordinate frame requires a new calibration. Two reference points determine a common scale,
-rotation, and translation; they do not determine separate X/Y stretch, shear,
-or individual disk placement errors. The third corner checks the model.
+If the exposure run list contains fewer than three disks or lies on one line,
+supply a separate list of mounted disks with `.\calibrate.bat --run-list "path\to\calibration-list.txt"`.
+Use the same skip-list path for calibration and exposure so both commands share
+the batch lock.
 
 For any nominal plate center `(x, y)` in micrometers, the saved mapping is
 `machine_xy = scale * rotation_matrix * [x, y] + translation_um`.
 Equivalently, multiply `transform_matrix` by the column vector `[x, y, 1]`.
-`load_calibration(path).apply(plate_position(row, col))` performs the complete
-mapping with the default nominal pitch. Keep fractional nominal centers;
-round only the final machine command. This maps disk centers and does not
-change the size or orientation of the exposure design itself.
+In Python, `spacing, transform = load_validated_plate_calibration(path)`
+loads the validated mapping. Use `transform.apply(plate_position(row, col, spacing))`
+for a disk's stage center. Only the final machine command is rounded.
 
 Use `--transform-file "path\plate-calibration.json"` to choose another shared
 file, `--spacing` for another pitch in um, or `--tesseract-cmd` if needed.
-Existing calibration files are backed up into the new run folder before
-replacement. Detailed results, raw OCR strings, log, and screenshots are
+When remeasuring a seated carrier, keep its skip list. Calibration archives
+the previous active transform in the run folder before measuring a replacement.
+Detailed results, raw OCR strings, log, and screenshots are
 saved under `runs\plate-calibration-<timestamp>`. Results are saved after
 each center find; `--output-dir` selects a different run folder.
 
 Calibration reads preserve decimal fractions and use the strict whole-line
 parser. Before each focus, the default allowed error is ±50 µm on each axis.
-For a found center, the default limit is a radial distance strictly less than
-half the grid spacing from its command. Larger shifts can indicate a wrong
-disk or coordinate reset. The OCR alarm identifies which check failed.
+For the two fit centers, the default limit is a radial distance strictly less
+than half the grid spacing from the command. Larger shifts can indicate a
+wrong disk or coordinate reset. The independent 500 µm acceptance limit is
+fixed and applies after the third center is read.
 On interruption, no automatic recovery motion is sent; inspect the current
 head/stage state before restarting.
 

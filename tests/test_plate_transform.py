@@ -219,6 +219,59 @@ class CalibrationFileTests(unittest.TestCase):
         self.assertEqual(list(self.directory.iterdir()), [self.path])
 
 
+class ProductionValidationTests(unittest.TestCase):
+    def setUp(self):
+        folder = self.enterContext(tempfile.TemporaryDirectory())
+        self.path = Path(folder) / "plate-calibration.json"
+        self.transform = SimilarityTransform(0, 1, -100, 200, 1.25)
+        self.spacing = 1001
+        self.anchors = [{"row": row, "col": col,
+                         "located_xy_um": self.transform.apply(plate_position(row, col, self.spacing))}
+                        for row, col in [(0, 0), (5, 5)]]
+
+    def record(self, disk=(0, 5), dx=300, dy=400, **changes):
+        expected = self.transform.apply(plate_position(*disk, self.spacing))
+        measurement = dict(row=disk[0], col=disk[1], expected_xy_um=expected,
+                           measured_xy_um=[expected[0] + dx, expected[1] + dy],
+                           error_distance_um=math.hypot(dx, dy))
+        measurement.update(changes)
+        save_calibration(self.path, self.transform, spacing=self.spacing,
+                         calibration_points=self.anchors, validation=measurement)
+
+    def test_inclusive_radial_limit_works_with_fractional_stage_prediction(self):
+        self.record()
+        self.assertEqual(plate_transform.load_validated_plate_calibration(self.path),
+                         (self.spacing, self.transform))
+
+    def test_rejects_excess_radial_error_unrelated_evidence_and_failed_check(self):
+        for changes in (dict(dx=400, dy=400), dict(dx=0, dy=500.001),
+                        dict(expected_xy_um=[0, 0]), dict(error_distance_um=0),
+                        dict(passed=False), dict(disk=(0, 0)), dict(disk=(2, 2))):
+            with self.subTest(changes=changes):
+                self.record(**changes)
+                with self.assertRaisesRegex(ValueError, "calibrate.bat"):
+                    plate_transform.load_validated_plate_calibration(self.path)
+
+    def test_missing_or_unvalidated_file_directs_operator_to_calibrate(self):
+        with self.assertRaisesRegex(FileNotFoundError, "calibrate.bat"):
+            plate_transform.load_validated_plate_calibration(self.path)
+        save_calibration(self.path, self.transform, spacing=self.spacing,
+                         calibration_points=self.anchors)
+        self.assertEqual(load_calibration(self.path), self.transform)
+        with self.assertRaisesRegex(ValueError, "calibrate.bat"):
+            plate_transform.load_validated_plate_calibration(self.path)
+
+    def test_wrong_rotation_about_the_validation_disk_cannot_pass(self):
+        held_out = plate_position(0, 5, self.spacing)
+        exact_third = self.transform.apply(held_out)
+        # A different transform maps the independent check disk to the same center.
+        self.transform = SimilarityTransform(1, 0, exact_third[0] - held_out[0],
+                                             exact_third[1] - held_out[1], 1.0)
+        self.record(dx=0, dy=0)
+        with self.assertRaisesRegex(ValueError, "two measured fit centers"):
+            plate_transform.load_validated_plate_calibration(self.path)
+
+
 class SimilarityTransformTests(unittest.TestCase):
     def assertPointAlmostEqual(self, actual, expected):
         for got, wanted in zip(actual, expected):
