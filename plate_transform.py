@@ -226,13 +226,14 @@ def _validate_calibration(document):
     return transform
 
 
-def save_calibration(path, transform, *, spacing, calibration_points, validation=None):
+def save_calibration(path, transform, *, spacing, calibration_points, validation=None, overwrite=True):
     """Atomically save a rigid (v1) or similarity (v2) calibration.
 
     ``calibration_points`` contains exactly two caller-defined dictionaries.
     ``validation`` may be omitted/pending while the tester reloads this file
     for an independent third-corner measurement. Saving does not approve the
-    fit for production; required accuracy remains a caller policy.
+    fit for production; required accuracy remains a caller policy. Set
+    overwrite=False to publish only if the destination is still absent.
     """
     if not isinstance(transform, RigidTransform):
         raise ValueError("transform must be a RigidTransform or SimilarityTransform")
@@ -268,7 +269,12 @@ def save_calibration(path, transform, *, spacing, calibration_points, validation
             handle.write(serialized)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary_path, path)
+        if overwrite:
+            os.replace(temporary_path, path)
+        elif os.name == "nt":
+            os.rename(temporary_path, path)  # Windows fails if the destination exists.
+        else:
+            os.link(temporary_path, path)    # Publish without replacing an existing POSIX file.
     finally:
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)

@@ -55,10 +55,19 @@ The [run list](run-list.txt) sets the order of the disks. It ships with all
 records each disk in `skip-list.txt` when it sends the final exposure
 confirmation.
 
-- **To resume this batch**, keep `skip-list.txt` and run `python real-dwl.py`.
-  The script visits the remaining positions in run-list order.
-- **To start a new batch**, stop the script, delete `skip-list.txt`, and
-  run `python real-dwl.py`. The script creates an empty skip list.
+If `plate-calibration.json` is missing, the script exposes the two farthest-apart
+pending disks first. It finds their centers optically and saves their measured
+stage coordinates before setting each disk's job origin. After both exposures
+finish, the script saves the calibration and uses it for the remaining disks in
+run-list order. With a valid calibration already present, it starts directly in
+run-list order. [Automatic calibration and restart details](install.md#automatic-plate-calibration)
+
+- **For a newly loaded carrier**, stop the previous run and run `.\new-batch.bat`
+  from the repository folder. It deletes `skip-list.txt` and
+  `plate-calibration.json`. Then run `python real-dwl.py` to start the batch
+  and calibrate for the new placement.
+- **To resume with the same carrier still seated**, run `python real-dwl.py`
+  directly. It uses the saved batch progress and calibration.
 
 If you're continuing a batch begun with the old hardcoded skip list, enter
 the already-started disks in `skip-list.txt` before launching the updated
@@ -89,6 +98,8 @@ xpos, ypos = str(round(stage_x)), str(round(stage_y))
 
 # Notes on co ord transform
 
-Production verifies the calibrated move, focuses once, then clicks Set zero
-at the disk center and checks the X/Y readout before starting the exposure.
+For a calibrated move, production verifies the position, focuses once, then
+clicks Set zero at the disk center and checks the X/Y readout before exposure.
+For a disk used to measure the calibration, it also refocuses after optical
+center finding.
 

@@ -1,3 +1,7 @@
+# 2026-11-20 (5,1)
+
+A java update pop up popped up on the control machine. 
+
 # 2026-10-12 (4,2)
 
 AF Momnent error

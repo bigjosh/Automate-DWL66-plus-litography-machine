@@ -6,7 +6,6 @@ Importing this file has no machine effects. All coordinates/results are in um.
 
 import argparse
 from datetime import datetime, timezone
-from decimal import Decimal
 import json
 import math
 import os
@@ -14,14 +13,14 @@ from pathlib import Path
 import shutil
 import tempfile
 
+from dwl_actions import check_frame, click, focus, optical_center_find, read_xy, send_absolute_move
 from plate_transform import (fit_similarity_transform, load_calibration, plate_position,
                              save_calibration)
-from xy_readout import ReadoutError, TesseractReader, parse_xy
+from xy_readout import TesseractReader
 
 
 CALIBRATION_CORNERS = ((0, 0), (5, 5))
 VALIDATION_CORNER = (0, 5)
-MOVE_TOLERANCE_UM = 50
 
 
 def save_report(output_dir, report):
@@ -45,90 +44,20 @@ def save_report(output_dir, report):
         temporary.unlink(missing_ok=True)
 
 
-def check_frame(psl, name, match_level, **options):
-    psl.info(f"Check {name}")
-    matched = psl.verifyFrame(name, matchLevel=match_level, **options)
-    if matched is not True:
-        raise RuntimeError(
-            f"Required check {name!r} was skipped/aborted. Calibration stopped.")
-
-
-def click(psl, name, message=None, *, double=False):
-    psl.info(message or f"Click {name}", point=name)
-    (psl.doubleClick if double else psl.click)(name)
-
-
-def read_xy(psl, tesseract_cmd, *, expected=None, center_near=None,
-            max_center_shift=None):
-    """Preserve decimal measurements; reject ambiguous OCR rather than repair it."""
-    def validate(text, margin=None):
-        values = parse_xy(text)
-        if not all(math.isfinite(float(value)) for value in values):
-            raise ReadoutError("X/Y readout is outside the finite numeric range.")
-        if expected is not None:
-            per_axis_limit = Decimal(str(margin))
-            errors = [abs(value - Decimal(str(target)))
-                      for value, target in zip(values, expected)]
-            if any(error > per_axis_limit for error in errors):
-                raise ReadoutError(
-                    f"Move check failed: read {values}, commanded {expected}; "
-                    f"must be within +/-{per_axis_limit} um on each axis.")
-        if center_near is not None:
-            shift = math.dist(tuple(map(float, values)), center_near)
-            radial_limit = margin if expected is None else max_center_shift
-            if shift >= radial_limit:
-                raise ReadoutError(
-                    f"Found center is {shift:.1f} um from the commanded position "
-                    f"(radial distance must be less than {radial_limit} um). Check that "
-                    "center finding did not zero/change the coordinates and that "
-                    "the intended disk was found.")
-        return values
-
-    text = psl.grabOCRTextLine(
-        "actual-xy", tesseract_cmd=tesseract_cmd, review=True,
-        retrycount=5, delay=5, margin=MOVE_TOLERANCE_UM if expected is not None else max_center_shift,
-        validator=validate)
-    return text, tuple(map(float, parse_xy(text)))
-
-
 def move_to(psl, target, tesseract_cmd):
     # Always verify the retracted head immediately before cross-disk travel.
     check_frame(psl, "z-zero", 0.999)
     check_frame(psl, "z-zero-check", 0.99)
-    click(psl, "global-alignment-tab")
-    psl.wait(1)
     command = tuple(round(value) for value in target)
-    for axis, value in zip(("x", "y"), command):
-        check_frame(psl, f"check{axis}-field-label", 0.99)
-        click(psl, f"{axis}-field", double=True)
-        psl.info(f"Type {axis.upper()}={value} um")
-        psl.sendkeys(str(value))
-    check_frame(psl, "move-absolute-check", 0.99)
-    click(psl, "move-absolute", f"Move absolute to X={command[0]}, Y={command[1]} um")
-    psl.wait(5)
+    send_absolute_move(psl, command)
     text, actual = read_xy(psl, tesseract_cmd, expected=command)
     psl.info(f"Move verified: X={actual[0]:.3f}, Y={actual[1]:.3f} um")
     return command, text, actual
 
 
 def find_center(psl):
-    # Same focus/alignment sequence and thresholds as the working production run.
-    click(psl, "focus-button", "Focus on this disk before optical center finding")
-    psl.wait(5)
-    check_frame(psl, "focus-executing", 0.96, delay=10, retrycount=24)
-    check_frame(psl, "focus-ready", 0.96, delay=10, retrycount=24)
-    click(psl, "alignment-tab")
-    check_frame(psl, "alignment-execute-image", 0.999)
-    click(psl, "near-execute", "Focus the alignment panel next to Execute")
-    click(psl, "alignment-execute")
-    psl.wait(1)
-    check_frame(psl, "check-alignment-confirm", 0.99, delay=10, retrycount=24)
-    click(psl, "pre-click-alignment-confirm")
-    click(psl, "click-alignment-confirm", "Confirm Find wafer center optical")
-    psl.wait(1)
-    check_frame(psl, "alignment-button-pushed", 0.9, delay=10, retrycount=10)
-    check_frame(psl, "alignment-button-popped", 0.9, delay=10, retrycount=10)
-    psl.wait(5)
+    focus(psl, "Focus on this disk before optical center finding")
+    optical_center_find(psl)
 
 
 def raise_head(psl):

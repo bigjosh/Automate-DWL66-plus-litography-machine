@@ -27,7 +27,7 @@ class FakePSL(ModuleType):
     """Only explicitly defined methods are available; none has live effects."""
 
     def __init__(self, read_results=None, *, center_read_results=None,
-                 zero_read_results=None, skip_check=None, margin_changes=None):
+                 zero_read_results=None, optical_results=None, skip_check=None, margin_changes=None):
         super().__init__("playwrightscriptlib")
         self.events = []
         self.moves = []
@@ -35,6 +35,7 @@ class FakePSL(ModuleType):
         self.center_reads = []
         self.move_reads = []
         self.zero_reads = []
+        self.optical_reads = []
         self.pending = {}
         self.pending_read = None
         self.click_point = None
@@ -43,6 +44,7 @@ class FakePSL(ModuleType):
         self.read_results = read_results or {}
         self.center_read_results = center_read_results or {}
         self.zero_read_results = zero_read_results or {}
+        self.optical_results = optical_results or {}
         self.margin_changes = margin_changes or {}
         self.skip_check = skip_check
 
@@ -110,6 +112,8 @@ class FakePSL(ModuleType):
             self.pending_read = ("center", 0, 0)
         elif name == "set-zero-button":
             self.pending_read = ("zero", 0, 0)
+        elif name == "click-alignment-confirm":
+            self.pending_read = ("optical", *self.moves[-1])
         elif name == "move-absolute":
             if set(self.pending) != {"x", "y"}:
                 raise AssertionError("Both coordinates must be typed before each move")
@@ -126,16 +130,18 @@ class FakePSL(ModuleType):
                         delay, margin, initial_delay=None):
         if not review or not callable(validator):
             raise AssertionError("Production XY reads require review/recovery and position validation")
-        if (retrycount, delay, margin) != (5, 5, 500):
-            raise AssertionError("Expected five OCR attempts, five-second spacing, and a 500 µm margin")
         if self.pending_read is None:
-            raise AssertionError("OCR read requires a fresh center, absolute move or Set zero")
+            raise AssertionError("OCR read requires a fresh move, center find, CENTER or Set zero")
         phase, x, y = self.pending_read
+        expected_margin = 28489 / 2 if phase == "optical" else 500
+        if (retrycount, delay, margin) != (5, 5, expected_margin):
+            raise AssertionError(f"Unexpected OCR options for {phase}: {(retrycount, delay, margin)}")
         self.pending_read = None
         phase_reads, results = {
             "center": (self.center_reads, self.center_read_results),
             "move": (self.move_reads, self.read_results),
             "zero": (self.zero_reads, self.zero_read_results),
+            "optical": (self.optical_reads, self.optical_results),
         }[phase]
         index = len(phase_reads)
         self.reads.append((name, tesseract_cmd))
@@ -154,7 +160,7 @@ class FakePSL(ModuleType):
         return result
 
 
-class RealDWLXYGateTests(unittest.TestCase):
+class SimulatedBatchTest(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -167,14 +173,6 @@ class RealDWLXYGateTests(unittest.TestCase):
         plate_transform.save_calibration(
             self.calibration, plate_transform.RigidTransform(1, 0, 0, 0),
             spacing=28489, calibration_points=[{'row': 0, 'col': 0}, {'row': 5, 'col': 5}])
-        # Capture a reference run in deliberately non-grid order using only
-        # temporary batch files. The operator's actual batch stays untouched.
-        self.reference = FakePSL()
-        self.config = self.run_script(self.reference)
-
-    def require_cycles(self, minimum=1):
-        if len(self.reference.moves) < minimum:
-            self.skipTest(f"Operator configuration enables fewer than {minimum} cycles")
 
     def run_script(self, fake, *, preflight_error=None, use_default_calibration=False,
                    resume=False, script=SCRIPT):
@@ -201,6 +199,26 @@ class RealDWLXYGateTests(unittest.TestCase):
         lines = self.skip_list.read_text(encoding="utf-8").splitlines()
         return [literal_eval(line.strip()) for line in lines
                 if line.strip() and not line.lstrip().startswith("#")]
+
+    def dry_run_copy(self):
+        # Use the same flag the operator would edit, in a temporary script.
+        text = SCRIPT.read_text(encoding="utf-8")
+        text, count = re.subn(r"(?m)^wetrun\s*=\s*(?:True|False)\b", "wetrun=False", text)
+        self.assertEqual(count, 1)
+        script = self.run_list.with_name("dry-run.py")
+        script.write_text(text, encoding="utf-8")
+        return script
+
+
+class RealDWLXYGateTests(SimulatedBatchTest):
+    def setUp(self):
+        super().setUp()
+        self.reference = FakePSL()
+        self.config = self.run_script(self.reference)
+
+    def require_cycles(self, minimum=1):
+        if len(self.reference.moves) < minimum:
+            self.skipTest(f"Operator configuration enables fewer than {minimum} cycles")
 
     def test_job_start_alone_leaves_disk_pending(self):
         if not self.config["wetrun"]:
@@ -254,14 +272,8 @@ class RealDWLXYGateTests(unittest.TestCase):
         self.assertEqual(self.recorded_positions(), self.positions)
 
     def test_dry_run_performs_moves_without_recording_exposures(self):
-        # Use the same flag the operator would edit, in a temporary script.
-        text = SCRIPT.read_text(encoding="utf-8")
-        text, count = re.subn(r"(?m)^wetrun\s*=\s*(?:True|False)\b", "wetrun=False", text)
-        self.assertEqual(count, 1)
-        script = self.run_list.with_name("dry-run.py")
-        script.write_text(text, encoding="utf-8")
         fake = FakePSL()
-        self.run_script(fake, script=script)
+        self.run_script(fake, script=self.dry_run_copy())
         self.assertEqual(fake.moves, self.reference.moves)
         self.assertNotIn(("click", "laser-confirm"), fake.events)
         self.assertEqual(self.skip_list.read_text(encoding="utf-8"), "")
@@ -303,18 +315,15 @@ class RealDWLXYGateTests(unittest.TestCase):
             previous_move = move_index
         self.assertEqual(len(fake.move_reads), len(enabled))
 
-    def test_missing_or_invalid_calibration_stops_before_connect_or_move(self):
-        for content, error in [(None, FileNotFoundError), ('{"version": 99}', ValueError)]:
-            with self.subTest(content=content):
-                if content is None:
-                    self.calibration.unlink()
-                else:
-                    self.calibration.write_text(content, encoding='utf-8')
-                fake = FakePSL()
-                with self.assertRaises(error):
-                    self.run_script(fake)
-                self.assertFalse(any(e[0] in {'connect', 'layout', 'click', 'field', 'type', 'read'}
-                                     for e in fake.events))
+    def test_invalid_calibration_stops_before_connect_or_move(self):
+        contents = '{"version": 99}'
+        self.calibration.write_text(contents, encoding='utf-8')
+        fake = FakePSL()
+        with self.assertRaises(ValueError):
+            self.run_script(fake)
+        self.assertFalse(any(e[0] in {'connect', 'layout', 'click', 'field', 'type', 'read'}
+                             for e in fake.events))
+        self.assertEqual(self.calibration.read_text(encoding='utf-8'), contents)
 
     def test_every_unskipped_move_gets_fresh_read_after_wait_before_focus(self):
         self.require_cycles()

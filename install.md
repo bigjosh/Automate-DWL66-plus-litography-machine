@@ -235,16 +235,18 @@ run. Retrying the OCR does not repeat a move, focus, or exposure.
 
 ## Start the production script
 
-From the DWL repository folder, after installation and machine preparation:
+For a newly loaded carrier, stop the previous run and execute `.\new-batch.bat`
+from the DWL repository folder. When resuming with the same carrier still
+seated, go directly to the production command.
 
 ```powershell
 .\.venv\Scripts\python.exe real-dwl.py --layout "layouts\2026-09-11-afternoon"
 ```
 
-At startup the script reads `plate-calibration.json` beside `real-dwl.py`.
-Use `--transform-file "path\plate-calibration.json"` to select another file.
-For each disk it logs the local target in µm, applies the saved transform,
-and rounds the stage coordinates to whole µm for Move absolute and its OCR check.
+At startup the script uses `plate-calibration.json` beside `real-dwl.py`, or
+the file specified by `--transform-file`. A missing file triggers automatic
+calibration. Each move logs the local and stage targets in µm and rounds the
+stage coordinates to whole µm for Move absolute and its OCR check.
 
 Omit `--layout` to choose a folder interactively. If Tesseract is installed in a
 different location, use an explicit path, for example:
@@ -256,7 +258,7 @@ different location, use an explicit path, for example:
 The script starts in single-step mode. Advance with the operator controls or
 select continuous operation when ready. Logs and screenshots are saved under
 `runs\<timestamp>`. The script checks the X/Y integer readouts within ±500 µm
-on each axis after CENTER and after the calibrated move. The script focuses
+on each axis after CENTER and after the move. For a calibrated disk it focuses
 once, waits for the executing and ready indicators, clicks **Set zero**, and
 checks that Actual X/Y are within the same tolerance of (0,0) before opening
 the Job tab. At the next disk it checks the CENTER reset options again.
@@ -266,6 +268,36 @@ For `set-zero-button-image` and `set-zero-button`, select the Stage panel's
 The CRD popup guard waits up to 30 seconds before mouse clicks and keyboard
 operations; a persistent popup prevents the pending input and raises an error.
 
+### Automatic plate calibration
+
+Removing and reseating the carrier changes its position relative to the stage.
+Every newly loaded batch needs a fresh calibration for that placement.
+
+Select **Find wafer center optical** with its automatic **Set zero** option
+off. When the selected calibration file is missing, the script chooses the
+two farthest-apart pending disks. Equal distances are resolved in run-list
+order. For a full tray in the default order, the pair is `(0,0)` and `(5,5)`.
+The nominal moves use the tray's 28,489 µm pitch.
+
+For each of these disks the script restores the common stage frame with
+**CENTER**, verifies the nominal move, focuses, and runs the optical center
+find. It saves the measured stage X/Y with decimal precision, refocuses and
+waits for focus-ready, then sets and verifies the job origin before exposure.
+After both exposures have passed the job-finished check, it saves and reloads
+the two-point transform. The remaining disks use calibrated moves and one
+focus each. A single remaining disk is optically centered and exposed without
+creating a two-point calibration. Dry runs keep measurements and the fitted
+transform in memory.
+
+Keep the calibration progress comments in `skip-list.txt` when resuming.
+If the script stopped after an exposure started but before it recorded
+completion for a calibration disk, it asks you to verify completion in the
+machine's job history. Choose **I verified exposure completed** only once
+you have confirmed that disk finished and the machine is ready. **Stop**
+leaves it pending review. Resuming uses the saved center and skips the
+already-started exposure. If an exposure *start* itself is uncertain, follow
+the pending-line instructions below first.
+
 ### Batch tracking and recovery
 
 The default [run-list.txt](run-list.txt) and local `skip-list.txt` live beside
@@ -274,10 +306,18 @@ run list ships with all 36 disks in row order. Edit it while the script is
 stopped to change the order or select a subset. Use `--run-list` and
 `--skip-list` to supply alternative file paths.
 
-For a **new batch**, delete the skip list while the script is stopped. The
-next launch creates an empty file. To **resume**, keep the file and run the
-same command again. The script skips every listed position. The earlier
-hardcoded list omitted row 0. If you are finishing an existing tray, copy any
+For a **new batch**, stop the previous run and execute `.\new-batch.bat`.
+It deletes `skip-list.txt` and `plate-calibration.json` beside the batch
+file. The next production run uses `run-list.txt` to select the disks for
+fresh calibration and exposure.
+
+If you override `--skip-list` or `--transform-file`, select fresh paths for
+the new batch or clear the corresponding files before launch. The reset
+command uses the default filenames.
+
+To **resume the same seated carrier**, keep the batch files and run the
+previous production command again. The script skips every listed position.
+The earlier hardcoded list omitted row 0. If you are finishing an existing tray, copy any
 already-started disks and any positions you still intend to skip into the
 skip list before the first launch.
 
