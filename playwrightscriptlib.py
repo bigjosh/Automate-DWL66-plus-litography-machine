@@ -40,7 +40,7 @@ import threading
 import time
 import traceback
 import uuid
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 from playwright.sync_api import sync_playwright
@@ -58,6 +58,7 @@ OCRError = _ocr.OCRError
 BLUR_RADIUS = 1.5      # gaussian blur applied to both frames before diffing
 DOWNSAMPLE = 2         # integer shrink factor applied after the blur
 DIFF_TOLERANCE = 25    # per-pixel max channel difference (0-255) counted as "same"
+CLICK_MATCH_LEVEL = 0.99
 
 WAIT_POPUP_MIN = 3     # wait() longer than this (seconds) shows the countdown popup
 
@@ -166,9 +167,18 @@ def _layout_entry(name, kind, redefine=False):
 
 
 def definePoint(name):
-    """Define/redefine a named point on a screenshot, without clicking it."""
+    """Define a point; preserve the visual check when editing an existing click."""
+    if _require_layout().saved_click(name) is not None:
+        return defineClick(name)
     entry = _layout_entry(name, "point", redefine=True)
     return (entry["x"], entry["y"])
+
+
+def defineClick(name):
+    """Record a named reference and click offset, returning the viewport point."""
+    screen = _ClickScreen()
+    entry = screen.layout.define_click(name, screen.clear_grab, before_commit=screen.check)
+    return _click_position(entry)
 
 
 def defineRegion(name):
@@ -394,21 +404,100 @@ def _wait_for_click_guard(action="click"):
             clear_count += 1
             if clear_count >= 2:
                 # No logging or UI between the final fresh check and input.
-                return
+                return last_shot
             if waiting:
                 _emit("Popup %r appears clear; confirming with another fresh capture" % guard["name"])
         time.sleep(min(guard["interval"], max(0.0, deadline - time.monotonic())))
 
 
-def click(x, y=None):
-    """Click a named layout point, or legacy (x, y) viewport coordinates."""
+class _ClickScreen:
+    """Keep capture, review and dispatch bound to the same page and geometry."""
+
+    def __init__(self):
+        self.page = _require_page()
+        self.layout = _require_layout()
+        self.size = self.layout.check_viewport(viewportSize())
+
+    def check(self):
+        if _page is not self.page or _layout is not self.layout:
+            raise _layouts.LayoutError("The page or layout changed while preparing the click.")
+        self.layout.check_viewport(viewportSize())
+
+    def grab(self, *, clear=False):
+        self.check()
+        # When the popup guard is enabled, use its last confirmed-clear frame.
+        # Both checks then describe exactly the same screen.
+        shot = _wait_for_click_guard() if clear else None
+        if shot is None:
+            shot = viewportGrab()
+        if _page is not self.page or _layout is not self.layout or shot.size != self.size:
+            raise _layouts.LayoutError("The screen changed while capturing the click target.")
+        return shot
+
+    def clear_grab(self):
+        return self.grab(clear=True)
+
+    def define(self, name):
+        return self.layout.define_click(name, self.clear_grab, before_commit=self.check,
+                                        prompt=False)
+
+
+def _click_position(entry):
+    left, top = entry["box"][:2]
+    dx, dy = entry["offset"]
+    return left + dx, top + dy
+
+
+def _verified_click_position(screen, name):
+    target = screen.layout.resolve_click(name, screen.clear_grab, before_commit=screen.check)
+    while True:
+        box = tuple(target["box"])
+        expected = loadFrame(target["image"])
+        full = screen.clear_grab()
+        actual = full.crop(box)
+        score = frameSimilarity(expected, actual)
+        if score >= CLICK_MATCH_LEVEL:
+            return _click_position(target)
+
+        detail = (f"Click target '{name}' does not match at its saved location. "
+                  f"Similarity {score:.4f}, required {CLICK_MATCH_LEVEL:.2f}.")
+        while True:
+            choice = alarm(detail, buttons=("Try compare again", "Show differences",
+                                            "Redefine click target", "Stop the script"))
+            if choice == 0:
+                break
+            if choice == 1:
+                _show_frame_differences(expected, actual, score, CLICK_MATCH_LEVEL,
+                                        box, full, screen.size)
+            elif choice == 2:
+                try:
+                    target = screen.define(name)
+                except _layouts.LayoutCancelled:
+                    continue
+                break
+            else:
+                raise SystemExit(2)
+
+
+def click(x, y=None, *, dispatch_context=None):
+    """Check a named target's image and click its saved offset on a match.
+
+    A missing or point-only target is defined interactively on first use.
+    Numeric (x, y) is the legacy coordinate API. Both forms honor the popup
+    guard. An optional context manager brackets only the mouse dispatch, so
+    callers can journal an attempted action after all visual checks pass.
+    """
     if isinstance(x, str) and y is None:
-        entry = _layout_entry(x, "point")
-        x, y = entry["x"], entry["y"]
-    elif y is None:
-        raise TypeError("click requires a layout name or both x and y")
-    _wait_for_click_guard()
-    _require_page().mouse.click(x, y)
+        screen = _ClickScreen()
+        x, y = _verified_click_position(screen, x)
+        page = screen.page
+    else:
+        if y is None:
+            raise TypeError("click requires a layout name or both x and y")
+        _wait_for_click_guard()
+        page = _require_page()
+    with dispatch_context if dispatch_context is not None else nullcontext():
+        page.mouse.click(x, y)
     if _clicks_settle_time > 0:
         time.sleep(_clicks_settle_time)
 
@@ -1532,6 +1621,21 @@ def _recapture_reference(layout_name, path, box, previous):
     return path, box
 
 
+def _show_frame_differences(expected, actual, score, match_level, box, full, viewport):
+    def refresh_capture():
+        return _grab_live_compare(box, expected.size, viewport)
+
+    try:
+        _diff_viewer(expected, actual, score, match_level, box=box, full=full,
+                     refresh_callback=refresh_capture)
+    except Exception:
+        try:
+            for path in _save_diff_files(expected, actual, full=full, box=box):
+                info("Saved %s" % path)
+        except Exception as exc:
+            info("Could not create diff images: %s" % exc)
+
+
 def verifyFrame(baselinePath, box=None, matchLevel=0.98, message=None, delay=0, retrycount=0,
                 fallthru=False):
     """Compare a named layout frame, or a legacy explicit PNG and rectangle.
@@ -1697,20 +1801,8 @@ def verifyFrame(baselinePath, box=None, matchLevel=0.98, message=None, delay=0, 
                 break
             if choice != 1:
                 break
-            try:
-                live_viewport = tuple(_require_layout().viewport) if named else None
-
-                def refresh_capture():
-                    return _grab_live_compare(region, baseline.size, live_viewport)
-
-                _diff_viewer(baseline, fresh, score, matchLevel, box=region, full=full,
-                             refresh_callback=refresh_capture)
-            except Exception:
-                try:
-                    for path in _save_diff_files(baseline, fresh, full=full, box=region):
-                        info("Saved %s" % path)
-                except Exception as e:
-                    info("Could not create diff images: %s" % e)
+            live_viewport = tuple(_require_layout().viewport) if named else None
+            _show_frame_differences(baseline, fresh, score, matchLevel, region, full, live_viewport)
         if choice in (0, 3):
             if choice == 0:
                 info("Retrying compare...")
@@ -1932,32 +2024,17 @@ def pauseOnInfo(enabled):
 def _reassign_point(name):
     """Select and save a named click position without sending target input."""
     _layouts.validate_name(name)
-    page = _require_page()
-    selected = _require_layout()
-    expected_viewport = viewportSize()
-
-    def check_context():
-        if _page is not page or _layout is not selected:
-            raise _layouts.LayoutError("The page or layout changed during click reassignment.")
-        if viewportSize() != expected_viewport:
-            raise _layouts.LayoutError("The viewport changed during click reassignment; point not saved.")
-        selected.check_viewport(expected_viewport)
-
-    def grab():
-        check_context()
-        screenshot = viewportGrab()
-        if screenshot.size != expected_viewport:
-            raise _layouts.LayoutError("The capture size changed during click reassignment.")
-        return screenshot
-
-    check_context()
-    # Validate any existing entry before offering to replace its coordinates.
-    selected.saved_entry(name, "point")
-    entry = selected.define(name, "point", grab, prompt=False, before_commit=check_context)
-    check_context()
+    screen = _ClickScreen()
+    if screen.layout.saved_click(name) is not None:
+        x, y = _click_position(screen.define(name))
+    else:
+        entry = screen.layout.define(name, "point", screen.grab, prompt=False,
+                                     before_commit=screen.check)
+        x, y = entry["x"], entry["y"]
+    screen.check()
     _emit("Reassigned click location '%s' to (%d, %d); waiting for the next-step choice"
-          % (name, entry["x"], entry["y"]))
-    return entry["x"], entry["y"]
+          % (name, x, y))
+    return x, y
 
 
 def _preview_click_location(name):

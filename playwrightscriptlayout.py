@@ -59,6 +59,18 @@ def _size(value):
     return tuple(value)
 
 
+def _check_click_offset(name, point, size):
+    if (not _integers(point, 2) or not 0 <= point[0] < size[0]
+            or not 0 <= point[1] < size[1]):
+        raise LayoutError("Click point for %r must be inside its reference rectangle." % name)
+
+
+def _check_click_reference(name, image):
+    if all(low == high for low, high in image.convert("RGB").getextrema()):
+        raise LayoutError("The click reference for %r is a solid color. "
+                          "Select a rectangle that also includes a distinctive label or icon." % name)
+
+
 def _read_json(path):
     try:
         with path.open("r", encoding="utf-8") as stream:
@@ -129,7 +141,7 @@ class Layout:
         return self.path / (validate_name(name) + ".json")
 
     def _validate(self, name, kind, entry):
-        if kind not in ("point", "region", "frame"):
+        if kind not in ("point", "region", "frame", "click"):
             raise LayoutError("Unknown layout entry kind %r." % kind)
         if entry.get("kind") != kind:
             raise LayoutError("Layout entry %r is a %r, but this action requires a %s."
@@ -147,7 +159,9 @@ class Layout:
                 raise LayoutError("Invalid rectangle bounds for %r." % name)
             if self.viewport and (box[2] > self.viewport[0] or box[3] > self.viewport[1]):
                 raise LayoutError("Rectangle %r is outside the layout viewport." % name)
-            if kind == "frame":
+            if kind == "click":
+                _check_click_offset(name, entry.get("offset"), (box[2] - box[0], box[3] - box[1]))
+            if kind in ("frame", "click"):
                 filename = entry.get("image")
                 if not isinstance(filename, str) or not filename:
                     raise LayoutError("Missing reference image for %r." % name)
@@ -166,6 +180,8 @@ class Layout:
                         if reference.size != (box[2] - box[0], box[3] - box[1]):
                             raise LayoutError("Reference image dimensions do not match rectangle %r." % name)
                         reference.load()
+                        if kind == "click":
+                            _check_click_reference(name, reference)
                 except (OSError, ValueError) as exc:
                     raise LayoutError("Cannot read reference image for %r: %s" % (name, exc)) from exc
                 entry = dict(entry, image=str(target))
@@ -174,18 +190,89 @@ class Layout:
     def saved_entry(self, name, kind):
         """Read and validate an existing entry, returning None if it is missing."""
         path = self._entry_path(name)
-        if kind not in ("point", "region", "frame"):
+        if kind not in ("point", "region", "frame", "click"):
             raise LayoutError("Unknown layout entry kind %r." % kind)
-        if path.exists():
-            return self._validate(name, kind, _read_json(path))
-        return None
+        if not path.exists():
+            return None
+        entry = _read_json(path)
+        if kind == "point" and entry.get("kind") == "click":
+            # Double clicks can share a target name and use only its saved geometry.
+            box = entry.get("box")
+            self._validate(name, "region", {"kind": "region", "box": box})
+            offset = entry.get("offset")
+            _check_click_offset(name, offset, (box[2] - box[0], box[3] - box[1]))
+            return {"version": 1, "kind": "point", "x": box[0] + offset[0],
+                    "y": box[1] + offset[1]}
+        return self._validate(name, kind, entry)
 
     def resolve(self, name, kind, grab):
         """Load a valid entry, or ask the operator to define a missing entry."""
+        if kind == "click":
+            return self.resolve_click(name, grab)
         entry = self.saved_entry(name, kind)
         if entry is not None:
             return entry
         return self.define(name, kind, grab)
+
+    def _click_or_legacy_point(self, name):
+        path = self._entry_path(name)
+        if not path.exists():
+            return None
+        entry = _read_json(path)
+        kind = "point" if entry.get("kind") == "point" else "click"
+        return self._validate(name, kind, entry)
+
+    def saved_click(self, name):
+        """A legacy point needs an operator-defined reference before a single click."""
+        entry = self._click_or_legacy_point(name)
+        return entry if entry and entry["kind"] == "click" else None
+
+    def resolve_click(self, name, grab, *, before_commit=None):
+        entry = self.saved_click(name)
+        if entry is not None:
+            return entry
+        return self.define_click(name, grab, before_commit=before_commit)
+
+    def define_click(self, name, grab, *, before_commit=None, prompt=True):
+        """Capture one frozen screen and atomically publish the operator-approved target."""
+        existing = self._click_or_legacy_point(name)
+        previous, old_point = None, None
+        if existing is not None:
+            if existing["kind"] == "click":
+                with Image.open(existing["image"]) as image:
+                    previous = image.copy()
+                left, top = existing["box"][:2]
+                dx, dy = existing["offset"]
+                old_point = (left + dx, top + dy)
+            else:
+                old_point = (existing["x"], existing["y"])
+        if prompt and not prompt_definition(name, "click"):
+            raise LayoutCancelled()
+        screenshot = grab()
+        if not isinstance(screenshot, Image.Image):
+            raise LayoutError("The screenshot provider must return a PIL image.")
+        self.check_viewport(screenshot.size)
+        box = pick_on_image(screenshot, "Select the button or target area for '%s'" % name,
+                            "rect", marker=old_point, reference=previous)
+        if box is None:
+            raise LayoutCancelled()
+        self._validate(name, "region", {"kind": "region", "box": box})
+        crop = screenshot.crop(box)
+        _check_click_reference(name, crop)
+        marker = None
+        if old_point and box[0] <= old_point[0] < box[2] and box[1] <= old_point[1] < box[3]:
+            marker = (old_point[0] - box[0], old_point[1] - box[1])
+        offset = pick_on_image(crop, "Choose where to click within '%s'" % name,
+                               "point", marker=marker)
+        if offset is None:
+            raise LayoutCancelled()
+        _check_click_offset(name, offset, crop.size)
+        if not confirm_reference(name, crop, previous=previous, click_offset=offset):
+            raise LayoutCancelled()
+        if before_commit is not None:
+            before_commit()
+        entry = {"version": 1, "kind": "click", "box": list(box), "offset": list(offset)}
+        return self._save_entry(name, entry, crop)
 
     def define(self, name, kind, grab, *, previous=None, before_commit=None, prompt=True):
         """Define/redefine an entry; cancellation leaves its previous files intact.
@@ -196,7 +283,9 @@ class Layout:
         Set prompt=False when the caller already obtained operator consent;
         selection, frame confirmation, cancellation and saving still apply.
         """
-        path = self._entry_path(name)
+        self._entry_path(name)  # Reject invalid names before opening any dialogs.
+        if kind == "click" and previous is None:
+            return self.define_click(name, grab, before_commit=before_commit, prompt=prompt)
         if kind not in ("point", "region", "frame"):
             raise LayoutError("Unknown layout entry kind %r." % kind)
         if previous is not None:
@@ -226,7 +315,7 @@ class Layout:
         # Validate the picked geometry before cropping (PIL pads outside bounds).
         self._validate(name, "point" if kind == "point" else "region",
                        dict(entry, kind="point" if kind == "point" else "region"))
-        image_path = None
+        crop = None
         if kind == "frame":
             crop = screenshot.crop(tuple(entry["box"]))
             confirmation_options = {"previous": previous} if previous is not None else {}
@@ -234,7 +323,11 @@ class Layout:
                 raise LayoutCancelled()
         if before_commit is not None:
             before_commit()
-        if kind == "frame":
+        return self._save_entry(name, entry, crop)
+
+    def _save_entry(self, name, entry, crop):
+        image_path = None
+        if crop is not None:
             filename = "%s-%s.png" % (name, uuid.uuid4().hex)
             image_path = self.path / filename
             temporary = self.path / (".reference-%s.tmp" % uuid.uuid4().hex)
@@ -248,8 +341,8 @@ class Layout:
                     temporary.unlink()
             entry["image"] = filename
         try:
-            resolved = self._validate(name, kind, entry)
-            _write_json(path, entry)
+            resolved = self._validate(name, entry["kind"], entry)
+            _write_json(self._entry_path(name), entry)
         except BaseException:
             if image_path is not None and image_path.exists():
                 image_path.unlink()
@@ -325,6 +418,14 @@ def prompt_definition(name, kind):
             "rectangle, then explicitly accept the preview as the expected reference."
         ) % name
         button_text = "Define reference"
+    elif kind == "click":
+        message = ("Set up the single click for '%s'.\n\n"
+                   "First check that the intended control is visible and ready. "
+                   "Choose Define click target, then drag a rectangle that includes "
+                   "the click point and a distinctive label or icon, even when the click lands "
+                   "in empty space. Keep changing values and hover highlights out of the rectangle. "
+                   "Choose the click point inside that image and confirm the preview.") % name
+        button_text = "Define click target"
     elif kind == "point":
         message = ("Define the click location for '%s'.\n\n"
                    "Choose Define location, then click the target on a frozen screenshot. "
@@ -352,7 +453,15 @@ def prompt_definition(name, kind):
     return result["accepted"]
 
 
-def _image_preview(parent, img, *, max_width, max_height):
+def _draw_click_marker(canvas, x, y):
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        line = (x + 2 * dx, y + 2 * dy, x + 11 * dx, y + 11 * dy)
+        canvas.create_line(*line, fill="black", width=3)
+        canvas.create_line(*line, fill="yellow", width=1)
+    canvas.create_rectangle(x, y, x + 1, y + 1, outline="yellow")
+
+
+def _image_preview(parent, img, *, max_width, max_height, marker=None):
     """Add a scrollable, unscaled image and retain its Tk image reference."""
     import tkinter as tk
     from PIL import ImageTk
@@ -372,6 +481,8 @@ def _image_preview(parent, img, *, max_width, max_height):
     photo = ImageTk.PhotoImage(img, master=parent)
     canvas.create_image(0, 0, image=photo, anchor="nw")
     canvas.image = photo
+    if marker is not None:
+        _draw_click_marker(canvas, *marker)
     return frame
 
 
@@ -654,7 +765,7 @@ def prompt_recapture(name, previous, *, fixed_box=None):
             pass
 
 
-def confirm_reference(name, crop, *, previous=None):
+def confirm_reference(name, crop, *, previous=None, click_offset=None):
     """Show exact crops at 1:1 and require explicit reference acceptance.
 
     With previous, show old and replacement together; cancellation returns to
@@ -664,10 +775,12 @@ def confirm_reference(name, crop, *, previous=None):
     root = _root("Accept expected reference")
     result = {"accepted": False}
     try:
-        tk.Label(root, text=("Expected reference for '%s' (%d x %d pixels)\n"
-                            "Confirm the new image shows the correct expected state. "
-                            "Previews are 1:1; scroll if needed.") %
-                 (name, crop.width, crop.height), justify="left", wraplength=620,
+        instructions = ("Expected reference for '%s' (%d x %d pixels)\n"
+                        "Confirm the new image shows the correct expected state. "
+                        "Previews are 1:1; scroll if needed.") % (name, crop.width, crop.height)
+        if click_offset is not None:
+            instructions += "\nThe yellow marker shows where the click will land within this image."
+        tk.Label(root, text=instructions, justify="left", wraplength=620,
                  font=("Segoe UI", 11)).pack(padx=15, pady=12)
         previews = tk.Frame(root)
         previews.pack(fill="both", expand=True, padx=15)
@@ -679,7 +792,8 @@ def confirm_reference(name, crop, *, previous=None):
             previews.columnconfigure(index, weight=1)
             tk.Label(column, text=label, font=("Segoe UI", 10)).pack(pady=(0, 5))
             _image_preview(column, img, max_width=root.winfo_screenwidth() * (0.4 if previous is not None else 0.8),
-                           max_height=root.winfo_screenheight() * 0.55)
+                           max_height=root.winfo_screenheight() * 0.55,
+                           marker=click_offset if img is crop else None)
         previews.rowconfigure(0, weight=1)
         buttons = tk.Frame(root)
         buttons.pack(padx=15, pady=15, anchor="e")
@@ -703,7 +817,7 @@ def confirm_reference(name, crop, *, previous=None):
             pass
 
 
-def pick_on_image(img, title, mode, *, reference=None):
+def pick_on_image(img, title, mode, *, reference=None, marker=None):
     """Select a point or rectangle on a frozen image, using recorder gestures.
 
     The screenshot is fitted to the screen. Coordinates refer to original
@@ -730,6 +844,8 @@ def pick_on_image(img, title, mode, *, reference=None):
         scale_x, scale_y = display.width / img.width, display.height / img.height
         instructions = ("Click the target spot. Esc cancels." if mode == "point" else
                         "Drag a rectangle around the region. Esc cancels.")
+        if marker is not None:
+            instructions += " Yellow marks the previously saved click."
         status = tk.Label(root, text=instructions, font=("Segoe UI", 11), anchor="w")
         status.pack(fill="x", padx=6, pady=3)
         photo = ImageTk.PhotoImage(display, master=root)
@@ -737,6 +853,9 @@ def pick_on_image(img, title, mode, *, reference=None):
                            highlightthickness=0, cursor="crosshair")
         canvas.pack()
         canvas.create_image(0, 0, image=photo, anchor="nw")
+        if marker is not None:
+            _draw_click_marker(canvas, int((marker[0] + 0.5) * scale_x),
+                               int((marker[1] + 0.5) * scale_y))
         if reference is not None:
             reference_frame = tk.Frame(root)
             reference_frame.pack(fill="x", padx=6, pady=(6, 3))

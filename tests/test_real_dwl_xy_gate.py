@@ -5,7 +5,7 @@ and pixel reads are also faked, so executing the script cannot operate hardware.
 """
 
 from ast import literal_eval
-from contextlib import chdir
+from contextlib import chdir, nullcontext
 from pathlib import Path
 import re
 import runpy
@@ -28,7 +28,8 @@ class FakePSL(ModuleType):
     """Only explicitly defined methods are available; none has live effects."""
 
     def __init__(self, read_results=None, *, center_read_results=None,
-                 zero_read_results=None, optical_results=None, skip_check=None, margin_changes=None):
+                 zero_read_results=None, optical_results=None, skip_check=None, margin_changes=None,
+                 click_mismatch=None):
         super().__init__("playwrightscriptlib")
         self.events = []
         self.moves = []
@@ -48,6 +49,7 @@ class FakePSL(ModuleType):
         self.optical_results = optical_results or {}
         self.margin_changes = margin_changes or {}
         self.skip_check = skip_check
+        self.click_mismatch = click_mismatch
 
     def logging(self, enabled):
         pass
@@ -103,12 +105,19 @@ class FakePSL(ModuleType):
             raise AssertionError("Coordinate typed without selecting a field")
         self.events.append(("type", text))
 
-    def click(self, name):
+    def click(self, name, *, dispatch_context=None):
         if self.click_point != name:
             raise AssertionError("Click pause must identify the pending click point")
         self.click_point = None
         if not any(event[0] == "click-guard" for event in self.events):
             raise AssertionError("Machine click before CRD popup guard setup")
+        if self.click_mismatch == name:
+            raise RuntimeError(f"Click target mismatch for {name}")
+        with dispatch_context if dispatch_context is not None else nullcontext():
+            self._dispatch_click(name)
+        self.wait(self.click_settle_seconds)
+
+    def _dispatch_click(self, name):
         if name == "center-button":
             self.pending_read = ("center", 0, 0)
         elif name == "set-zero-button":
@@ -122,7 +131,6 @@ class FakePSL(ModuleType):
             self.pending_read = ("move", self.pending["x"], self.pending["y"])
             self.pending.clear()
         self.events.append(("click", name))
-        self.wait(self.click_settle_seconds)
 
     def wait(self, seconds):
         self.events.append(("wait", seconds))
@@ -237,6 +245,37 @@ class RealDWLXYGateTests(SimulatedBatchTest):
         self.assertIn(("click", "job-start"), fake.events)
         self.assertNotIn(("click", "laser-confirm"), fake.events)
         self.assertEqual(self.skip_list.read_text(encoding="utf-8"), "")
+
+    def test_click_image_mismatch_stops_before_origin_or_exposure_click(self):
+        if not self.config["wetrun"]:
+            self.skipTest("Exposure disabled in operator configuration")
+        for target in ("set-zero-button", "laser-confirm"):
+            with self.subTest(target=target):
+                fake = FakePSL(click_mismatch=target)
+                with self.assertRaisesRegex(RuntimeError, f"Click target mismatch for {target}"):
+                    self.run_script(fake)
+                self.assertNotIn(("click", target), fake.events)
+                self.assertNotIn(("click", "laser-confirm"), fake.events)
+                self.assertEqual(self.skip_list.read_bytes(), b"")
+
+    def test_failed_exposure_dispatch_keeps_uncertain_marker(self):
+        if not self.config["wetrun"]:
+            self.skipTest("Exposure disabled in operator configuration")
+        fake = FakePSL()
+        dispatch = fake._dispatch_click
+        row, col = self.positions[0]
+        marker = f"# pending exposure ({row},{col})\n".encode("ascii")
+
+        def interrupt_dispatch(name):
+            if name == "laser-confirm":
+                self.assertEqual(self.skip_list.read_bytes(), marker)
+                raise RuntimeError("Lost connection during click")
+            dispatch(name)
+
+        with patch.object(fake, "_dispatch_click", side_effect=interrupt_dispatch):
+            with self.assertRaisesRegex(RuntimeError, "during click"):
+                self.run_script(fake)
+        self.assertEqual(self.skip_list.read_bytes(), marker)
 
     def test_resume_after_confirm_skips_disk_even_if_job_finish_check_failed(self):
         if not self.config["wetrun"]:
@@ -402,7 +441,7 @@ class RealDWLXYGateTests(SimulatedBatchTest):
             sequence = [
                 ("read", "center", index), ("click", "move-absolute"), ("read", "move", index),
                 ("click", "focus-button"), ("verify", "focus-executing"), ("verify", "focus-ready"),
-                ("verify", "set-zero-button-image"), ("click", "set-zero-button"),
+                ("click", "set-zero-button"),
                 ("read", "zero", index), ("click", "job-tab"),
             ]
             if self.config["wetrun"]:
@@ -422,9 +461,9 @@ class RealDWLXYGateTests(SimulatedBatchTest):
         self.assertIn(("verify", "center-reset-options"), fake.events)
         self.assertFalse(any(e[0] in {"click", "field", "type"} for e in fake.events))
 
-    def test_skipped_focus_or_set_zero_check_stops_before_setting_origin(self):
+    def test_skipped_focus_check_stops_before_setting_origin(self):
         self.require_cycles()
-        for name in ("focus-executing", "focus-ready", "set-zero-button-image"):
+        for name in ("focus-executing", "focus-ready"):
             with self.subTest(skipped=name):
                 fake = FakePSL(skip_check=name)
                 with self.assertRaises(RuntimeError):

@@ -62,7 +62,6 @@ def check_stage_position(expected, ocr_cmd, description="X/Y PASS", *, initial_d
 def restore_stage_frame(ocr_cmd, *, calibrating):
     # CENTER with both resets restores the frame in which the two centers are measured.
     check_frame(psl, "z-zero", 0.999, required=calibrating)
-    check_frame(psl, "center-button-image", 0.99, required=calibrating)
     check_frame(psl, "z-zero-check", 0.99, required=calibrating)
     check_frame(psl, "center-reset-options", 1.0,
                 message="Expected both CENTER reset options to be checked")
@@ -81,7 +80,6 @@ def measure_disk_center(calibration, position, command, ocr_cmd):
 
 
 def set_disk_origin(ocr_cmd):
-    check_frame(psl, "set-zero-button-image", 0.99)
     click(psl, "set-zero-button", "Set the job origin at this disk center")
     time.sleep(max(0, 5 - CLICK_SETTLE_SECONDS))
     check_stage_position((0, 0), ocr_cmd, "Disk origin verified after Set zero", initial_delay=0)
@@ -92,8 +90,7 @@ def expose_disk(batch, position, *, calibrating):
     psl.wait(3)
     check_frame(psl, "laser-confirm-image", 0.998, required=calibrating)
     psl.info("Click laser-confirm -- START WRITING", point="laser-confirm")
-    with batch.starting_exposure(position):
-        psl.click("laser-confirm")
+    psl.click("laser-confirm", dispatch_context=batch.starting_exposure(position))
     check_frame(psl, "job-finished", 0.99, delay=10, retrycount=78, required=calibrating)
 
 

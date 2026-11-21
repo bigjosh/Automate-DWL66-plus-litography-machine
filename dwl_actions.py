@@ -33,7 +33,6 @@ def send_absolute_move(psl, command, *, require_match=True):
         click(psl, f"{axis}-field", double=True)
         psl.info(f"Type {axis.upper()}={value} um")
         psl.sendkeys(str(value))
-    check_frame(psl, "move-absolute-check", 0.99, required=require_match)
     click(psl, "move-absolute", f"Move absolute to X={x}, Y={y} um")
     psl.wait(5)
 

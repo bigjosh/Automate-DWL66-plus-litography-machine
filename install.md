@@ -200,13 +200,38 @@ the ready state; do not accept a busy/error screen just to clear a mismatch.
 If the script is already running when you update the library, restart it to
 load the new button.
 
+### Single-click targets
+
+The first time a DWL program reaches a named single click with no saved
+reference, it pauses for you to record one. This includes controls that
+already have a saved click coordinate. On the frozen screenshot, select a
+tight rectangle around the intended control, mark the click point inside it,
+and review the marked preview. Include a distinctive label or icon in the
+rectangle. For a click on empty space beside a button, include the adjacent
+button so the image identifies the right place. Leave changing coordinates
+and status text outside the rectangle.
+
+Approving the capture saves it in `layout/` for all DWL programs. Each
+single click requires a similarity score of at least 0.99 on a fresh capture
+at those bounds, including the first click after recording. If the control moved, **Show
+differences** lets you compare the images while realigning the panel. Then
+choose **Try compare again**. Use **Redefine click target** for a deliberate
+layout change, or **Stop the script** to end the run. A mismatch blocks the
+click in both single-step and continuous mode.
+
+The X/Y entry fields use double clicks because their contents change. They
+keep their saved coordinates and the positioning sequence checks the field
+labels.
+
 In single-step mode, choose **Show click location** before any named click or
 double-click in `real-dwl.py` to see the saved target on a fresh screenshot.
 The crosshair and magnified view show where the click will land. Choose
 **Back to step** to return to the same pause. Open the preview again to refresh it.
 
-To move the target, choose **Reassign click location** and click the new
-target on the frozen screenshot. The point is saved in `layout/`.
+To move the target, choose **Reassign click location**. For a target with a
+saved click image, capture the new rectangle and mark the new point inside
+it. For a coordinate-only entry, select the new point on the frozen
+screenshot. Its first single click will still prompt for a reference.
 Choose **Next Step** when ready to send the click.
 Canceling the picker leaves the old point unchanged and returns to the pause.
 Closing a click-step dialog stops the script. Reassignment sends no input to
@@ -265,8 +290,8 @@ once, waits for the executing and ready indicators, clicks **Set zero**, and
 checks that Actual X/Y are within the same tolerance of (0,0) before opening
 the Job tab. At the next disk it checks the CENTER reset options again.
 If your layout asks for `center-reset-options`, select the two checked boxes.
-For `set-zero-button-image` and `set-zero-button`, select the Stage panel's
-**Set zero** button as the reference image and click point, respectively.
+For `set-zero-button`, capture the Stage panel’s **Set zero** button and mark
+a point inside it.
 The CRD popup guard waits up to 30 seconds before mouse clicks and keyboard
 operations; a persistent popup prevents the pending input and raises an error.
 
@@ -328,7 +353,9 @@ writing, and the script records that disk immediately afterward, before it
 waits for completion. A disk whose exposure was interrupted therefore stays
 in the skip list.
 
-If the script stops during the confirmation click, the skip list can contain
+Stopping at the confirmation button’s target-image check leaves the disk
+eligible to run. If the script stops during the actual confirmation click,
+the skip list can contain
 a line such as `# pending exposure (2,3)`. The next launch stops on that line.
 Check the machine's job history for that disk. If exposure started, replace
 the entire line with `(2,3)`. If it definitely did not start, remove the line.

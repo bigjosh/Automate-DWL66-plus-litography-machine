@@ -90,10 +90,10 @@ class AutomaticCalibrationTests(SimulatedBatchTest):
         fake = self.machine(disks)
         click = fake.click
 
-        def stop_before_second_anchor(name):
+        def stop_before_second_anchor(name, **options):
             if name == "center-button" and len(fake.moves) == 1:
                 raise RuntimeError("between anchors")
-            click(name)
+            click(name, **options)
 
         with patch.object(fake, "click", side_effect=stop_before_second_anchor):
             with self.assertRaisesRegex(RuntimeError, "between anchors"):
@@ -147,12 +147,12 @@ class AutomaticCalibrationTests(SimulatedBatchTest):
         fake = self.machine(disks)
         click = fake.click
 
-        def require_saved_measurement_before_refocus(name):
+        def require_saved_measurement_before_refocus(name, **options):
             if name == "focus-button" and fake.optical_reads:
                 x, y = measured_center(disks[0])
                 self.assertIn(f"X={x:.6f}, Y={y:.6f}", self.skip_list.read_text(encoding="utf-8"))
                 fake.skip_check = "focus-ready"
-            click(name)
+            click(name, **options)
 
         with patch.object(fake, "click", side_effect=require_saved_measurement_before_refocus):
             with self.assertRaises(RuntimeError):

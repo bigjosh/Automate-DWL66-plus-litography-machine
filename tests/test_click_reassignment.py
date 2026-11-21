@@ -93,11 +93,22 @@ class ClickReassignmentTests(unittest.TestCase):
         self.prompt.assert_not_called()
         self.assert_no_input()
 
-    def test_next_step_click_uses_saved_point_and_popup_guard_exactly_once(self):
-        psl.info("Click X field", point="x-field")
-        self.assert_no_input()
-        psl.click("x-field")
-        self.assertEqual(self.events, ["guard", ("click", 90, 80)])
+    def test_next_step_single_click_after_reassign_verifies_new_button_image(self):
+        screen = self.capture.return_value
+        screen.paste("navy", (20, 20, 25, 25))
+        screen.paste("green", (90, 80, 96, 86))
+        screen.crop((15, 15, 35, 35)).save(self.folder / "button.png")
+        (self.folder / "move-absolute.json").write_text(json.dumps({
+            "version": 1, "kind": "click", "box": [15, 15, 35, 35],
+            "offset": [7, 8], "image": "button.png",
+        }), encoding="utf-8")
+        self.picker.side_effect = [(86, 77, 100, 95), (4, 3)]
+        self.patch(layouts, "confirm_reference", return_value=True)
+        psl.info("Click Move absolute", point="move-absolute")
+        self.assertEqual(self.events, ["guard"])  # Clear screen for recording.
+        self.page.mouse.click.assert_not_called()
+        psl.click("move-absolute")
+        self.assertEqual(self.events, ["guard", "guard", ("click", 90, 80)])
         self.page.mouse.click.assert_called_once_with(90, 80)
         self.page.mouse.dblclick.assert_not_called()
 
@@ -260,11 +271,11 @@ class ClickReassignmentTests(unittest.TestCase):
 
     def test_run_continuously_after_edit_is_explicit_and_uses_new_point(self):
         self.window.side_effect = [2, 1]
-        psl.info("Click X field", point="x-field")
+        psl.info("Double-click X field", point="x-field")
         self.assertFalse(psl._pause_on_info)
         self.assert_no_input()
-        psl.click("x-field")
-        self.assertEqual(self.events, ["guard", ("click", 90, 80)])
+        psl.doubleClick("x-field")
+        self.assertEqual(self.events, ["guard", ("double", 90, 80)])
 
 
 class PauseCloseBehaviorTests(unittest.TestCase):

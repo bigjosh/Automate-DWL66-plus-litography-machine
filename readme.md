@@ -41,8 +41,11 @@ Do these before starting the script
 * Make sure the right job is loaded on the Jobs tab (currently `zzzzzzzpfstandardraster1103`)
 
 The DWL programs automatically use the [layout folder](layout/) beside the
-scripts for click positions, capture rectangles, and reference images. If a
-panel has moved, line it up with the reference or redefine the affected entries.
+scripts. The first time the script reaches a single click with only an old
+coordinate, it asks you to capture the control and mark the click inside it.
+On later runs it checks that same screen area immediately before clicking.
+The X/Y entry fields keep their coordinate-only double clicks.
+[Recording and realigning click targets](install.md#single-click-targets)
 
 # Start Script
 
