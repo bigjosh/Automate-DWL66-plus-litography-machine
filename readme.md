@@ -60,19 +60,22 @@ from the repository folder.
    [run-list template](run-list.txt) and starts an empty `skip-list.txt` for
    this carrier. The template includes all 36 disks in row order. To change the
    order or subset for this carrier, edit the copy in the new folder.
-2. `.\calibrate.bat` optically centers three disks without exposing them. It
-   fits the two farthest-apart centers and checks a third disk independently.
-   A radial error of **500 µm or less** passes. A successful calibration saves
-   `plate-calibration.json` in the run folder and prints pitch, stage offsets,
-   rotation and check error.
-3. `.\run.bat` opens the folder with the latest `YYMMDD HHMMSS` timestamp
-   directly under `runs\`. It exposes the pending disks in that run's list
-   order and records each exposure start in that run's skip list.
+2. `.\run.bat` opens the latest timestamped run. On a fresh run it picks the
+   two farthest-apart disks in the run list that are still pending. At each
+   disk it moves to the nominal position, focuses, finds the optical center,
+   reads its stage X/Y, clicks **Set zero**, verifies zero, focuses again,
+   and writes. After the second exposure completes, it saves the transform in
+   `plate-write-calibration.json`.
+3. The same script continues through the remaining disks in run-list order.
+   It uses the saved transform for each move, verifies the stage X/Y, focuses
+   once, sets and verifies zero, then writes.
 
 **To resume the same seated carrier**, run `.\run.bat` again. Creating another
 run starts a fresh exposure record. If the carrier was partially exposed
 before this folder workflow was introduced, use the
 [existing-carrier recovery instructions](install.md#batch-tracking-and-recovery).
+An [optional three-disk calibration](install.md#optional-three-disk-calibration)
+is also available for measuring the seated carrier without writing.
 
 The script starts in single step mode so you have to click next for each step.
 
@@ -95,7 +98,7 @@ from plate_transform import load_validated_plate_calibration, plate_position
 from run_folders import latest_run
 
 run_folder = latest_run(Path.cwd())  # From the DWL repository folder
-spacing, plate_to_stage = load_validated_plate_calibration(run_folder / "plate-calibration.json")
+spacing, plate_to_stage = load_validated_plate_calibration(run_folder / "plate-write-calibration.json")
 local_xy = plate_position(r, c, spacing)
 stage_x, stage_y = plate_to_stage.apply(local_xy)
 xpos, ypos = str(round(stage_x)), str(round(stage_y))

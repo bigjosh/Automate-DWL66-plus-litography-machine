@@ -1,6 +1,15 @@
 {
   "version": 1,
-  "kind": "point",
-  "x": 1345,
-  "y": 835
+  "kind": "click",
+  "box": [
+    1330,
+    826,
+    1360,
+    840
+  ],
+  "offset": [
+    18,
+    8
+  ],
+  "image": "pre-click-alignment-confirm-5bc5895a01d542288613308b4d55b7c1.png"
 }

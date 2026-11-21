@@ -1,6 +1,15 @@
 {
   "version": 1,
-  "kind": "point",
-  "x": 928,
-  "y": 1016
+  "kind": "click",
+  "box": [
+    889,
+    1006,
+    967,
+    1025
+  ],
+  "offset": [
+    41,
+    11
+  ],
+  "image": "move-absolute-eb8a9b7362da41229a76d0da64ea48bc.png"
 }

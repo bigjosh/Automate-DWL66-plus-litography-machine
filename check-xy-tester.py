@@ -12,7 +12,7 @@ from tkinter import messagebox, ttk
 from PIL import Image, ImageTk
 
 from dwl_actions import LAYOUT_DIR
-from xy_readout import ReadoutError, TesseractReader, parse_xy
+from xy_readout import ReadoutError, TesseractReader, format_xy_difference, parse_xy, xy_difference
 
 
 # Load the shared capture UI and position helpers without executing main().
@@ -44,9 +44,8 @@ def check_position(raw_text, position, *, ocr_error=None):
     except ReadoutError as exc:
         result["reason"] = f"Could not parse X/Y: {exc}"
         return result
-    dx = actual_x - Decimal(str(position[0]))
-    dy = actual_y - Decimal(str(position[1]))
-    passed = abs(dx) <= TOLERANCE and abs(dy) <= TOLERANCE
+    dx, dy = xy_difference((actual_x, actual_y), position)
+    passed = dx.copy_abs() <= TOLERANCE and dy.copy_abs() <= TOLERANCE
     result.update(
         actual_x=str(actual_x), actual_y=str(actual_y),
         error_x=str(dx), error_y=str(dy), passed=passed,
@@ -62,7 +61,7 @@ def format_result(result):
         if result["actual_x"] is not None else "unavailable"
     )
     errors = (
-        f"X={result['error_x']}, Y={result['error_y']} um"
+        format_xy_difference(Decimal(result['error_x']), Decimal(result['error_y']))
         if result["error_x"] is not None else "unavailable"
     )
     return (

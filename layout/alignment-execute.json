@@ -1,6 +1,15 @@
 {
   "version": 1,
-  "kind": "point",
-  "x": 1495,
-  "y": 427
+  "kind": "click",
+  "box": [
+    1464,
+    418,
+    1522,
+    436
+  ],
+  "offset": [
+    32,
+    9
+  ],
+  "image": "alignment-execute-d0b627f0f25949d4a44f868ba226aa54.png"
 }

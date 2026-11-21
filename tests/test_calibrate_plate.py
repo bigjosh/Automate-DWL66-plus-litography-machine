@@ -60,6 +60,7 @@ class FakeMachine:
         self.events = []
         self.moves = []
         self.messages = []
+        self.read_details = {}
         self.centers = [transformed(nominal(r, c, spacing), scale=scale)
                         for r, c in DISKS]
         self.centers[2] = tuple(a + b for a, b in zip(self.centers[2], third_error))
@@ -174,10 +175,9 @@ class FakeMachine:
         text = self.bad_reads.get((phase, index),
                                   f"X={position[0]:.6f}, Y={position[1]:.6f} um")
         self.events.append(("read", phase, index, text))
-        if margin is None:
-            validator(text)
-        else:
-            validator(text, self.margin_changes.get((phase, index), float(margin)))
+        details = (validator(text) if margin is None else
+                   validator(text, self.margin_changes.get((phase, index), float(margin))))
+        self.read_details[phase, index] = details
         if phase == "move":
             self.move_read_ok = True
         self.read_phase = None
@@ -270,11 +270,12 @@ class CalibrationWorkflowTests(unittest.TestCase):
         self.assertEqual((active / "skip-list.txt").read_bytes(), b"")
 
     def test_held_out_error_uses_radial_limit_and_failed_recalibration_retires_old_file(self):
-        machine = FakeMachine(third_error=(400, 400))
+        machine = FakeMachine(third_error=(400, -400))
         active = Path(self.temp.name) / "active.json"
         active.write_bytes(b"previous calibration")
-        with self.assertRaisesRegex(ValueError, r"center error .* exceeds 500 um"):
+        with self.assertRaisesRegex(ValueError, r"center error .* exceeds 500 um") as failure:
             self.run_calibration(machine, transform_file=active)
+        self.assertIn("measured - predicted: X=+400.000, Y=-400.000 um", str(failure.exception))
         self.assertEqual(self.saved_report()["status"], "stopped")
         self.assertAlmostEqual(self.saved_report()["validation"]["error_distance_um"],
                                math.hypot(400, 400), places=5)
@@ -320,6 +321,8 @@ class CalibrationWorkflowTests(unittest.TestCase):
         validation = report["validation"]
         self.assertAlmostEqual(validation["error_x_um"], 12.3, places=5)
         self.assertAlmostEqual(validation["error_y_um"], -4.5, places=5)
+        self.assertTrue(any("measured - predicted: X=+12.300, Y=-4.500 um" in message
+                            for message in machine.messages))
         self.assertAlmostEqual(validation["error_distance_um"], math.hypot(12.3, 4.5), places=5)
         for value, target in zip(validation["expected_xy_um"], expected):
             self.assertAlmostEqual(value, target, places=5)
@@ -346,7 +349,7 @@ class CalibrationWorkflowTests(unittest.TestCase):
             self.assertLess(focus, center_read)
             self.assertIn(("verify", "focus-ready", index + 1),
                           machine.events[focus:center_read])
-            self.assertIn(("verify", "alignment-button-pushed", index + 1),
+            self.assertIn(("verify", "alignment-button-popped", index + 1),
                           machine.events[focus:center_read])
 
     def test_measurements_keep_decimal_values_and_raw_ocr(self):
@@ -363,12 +366,15 @@ class CalibrationWorkflowTests(unittest.TestCase):
                             round(report["measurements"][0]["located_xy_um"][0]))
 
     def test_failed_move_read_blocks_focus_and_further_motion(self):
-        for index, delta in enumerate(((50.1, 0), (0, -50.1))):
+        for index, (delta, difference) in enumerate((
+                ((50.1, 0), "X=+50.100000, Y=+0.000000 um"),
+                ((0, -50.1), "X=+0.000000, Y=-50.100000 um"))):
             with self.subTest(delta=delta):
                 self.output_dir = Path(self.temp.name) / f"calibration-{index}"
                 machine = FakeMachine(move_errors={0: delta})
-                with self.assertRaises(ReadoutError):
+                with self.assertRaises(ReadoutError) as failure:
                     self.run_calibration(machine)
+                self.assertIn(difference, str(failure.exception))
                 self.assertEqual(len(machine.moves), 1)
                 self.assertNotIn(("click", "focus-button"), machine.events)
                 self.assertNotIn(("click", "laser-up-click"), machine.events)
@@ -376,6 +382,17 @@ class CalibrationWorkflowTests(unittest.TestCase):
     def test_exact_move_tolerance_remains_inclusive(self):
         machine = FakeMachine(move_errors={0: (50, -50)})
         self.assertEqual(self.run_calibration(machine)["status"], "complete")
+        self.assertTrue(any("read - commanded: X=+50.000, Y=-50.000 um" in message
+                            for message in machine.messages))
+
+    def test_decimal_read_review_compares_move_and_optical_center_to_command(self):
+        machine = FakeMachine(move_errors={0: (3.25, -4.5)})
+        machine.centers = [(round(x) - 3, round(y) + 4)
+                           for x, y in (nominal(*disk) for disk in DISKS)]
+        self.run_calibration(machine)
+        self.assertIn("X=+3.250000, Y=-4.500000 um", machine.read_details["move", 0])
+        self.assertIn("X=-3.000000, Y=+4.000000 um", machine.read_details["center", 0])
+        self.assertIn("radial distance 5.0 um", machine.read_details["center", 0])
 
     def test_adjusted_move_margin_preserves_fractional_displacement(self):
         machine = FakeMachine(move_errors={0: (50.125, 0)}, margin_changes={("move", 0): 50.125})
@@ -387,8 +404,9 @@ class CalibrationWorkflowTests(unittest.TestCase):
         machine = FakeMachine(margin_changes={("center", 0): 5})
         x, y = map(round, nominal(0, 0))
         machine.centers[0] = (x + 3, y + 4)
-        with self.assertRaisesRegex(ReadoutError, "radial distance must be less than 5"):
+        with self.assertRaisesRegex(ReadoutError, "radial distance must be less than 5") as failure:
             self.run_calibration(machine)
+        self.assertIn("X=+3.000000, Y=+4.000000 um", str(failure.exception))
         self.assertEqual(len(machine.moves), 1)
 
     def test_malformed_decimal_measurement_blocks_next_motion(self):

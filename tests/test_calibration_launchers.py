@@ -24,16 +24,16 @@ class CalibrationStatsTests(unittest.TestCase):
             shutil.copyfile(PROJECT / name, folder / name)
         (folder / "run-list.txt").write_text("(0,0)\n", encoding="utf-8")
         old = create_run(folder)
-        self.write_calibration(old / "plate-calibration.json")
+        self.write_calibration(old / "plate-write-calibration.json", two_exposed=True)
         self.cwd = folder / "different working folder"
         self.cwd.mkdir()
-        self.default = create_run(folder) / "plate-calibration.json"
+        self.default = create_run(folder) / "plate-write-calibration.json"
 
     def stats(self, *args):
         return subprocess.run([sys.executable, "-B", str(self.script), *map(str, args)],
                               cwd=self.cwd, capture_output=True, text=True, timeout=15)
 
-    def write_calibration(self, path):
+    def write_calibration(self, path, *, two_exposed=False):
         spacing = 28000.0
         transform = SimilarityTransform(0.0, -1.0, 220.4, -350.123, 1.0125)
         anchors = []
@@ -43,20 +43,20 @@ class CalibrationStatsTests(unittest.TestCase):
                             "located_xy_um": transform.apply(local)})
         expected = transform.apply(plate_position(0, 5, spacing))
         validation = {"row": 0, "col": 5, "expected_xy_um": expected,
-                      "measured_xy_um": [expected[0] + 3, expected[1] + 4],
-                      "error_x_um": 3.0, "error_y_um": 4.0, "error_distance_um": 5.0}
+                      "measured_xy_um": [expected[0] + 3, expected[1] - 4], "error_distance_um": 5.0}
         save_calibration(path, transform, spacing=spacing, calibration_points=anchors,
-                         validation=validation)
+                         validation={"method": "two_exposed_anchors"} if two_exposed else validation)
 
-    def test_reads_latest_file_and_reports_measured_geometry(self):
+    def test_reads_latest_production_geometry_and_names_both_exposed_disks(self):
         self.assertNotEqual(self.stats().returncode, 0)
-        self.write_calibration(self.default)
+        self.write_calibration(self.default, two_exposed=True)
         result = self.stats()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(str(self.default), result.stdout)
         for expected in ("28.350000 mm", "28.000000 mm", "1.012500000", "+220.400 um",
-                         "-350.123 um", "-90.000000 deg", "(0,5)", "5.000 um (limit 500 um)"):
+                         "-350.123 um", "-90.000000 deg", "(0,0) and (5,5)", "No third disk measured"):
             self.assertIn(expected, result.stdout)
+        self.assertNotIn("Third-center error", result.stdout)
 
     def test_reads_explicit_path_and_reports_invalid_files(self):
         relative = Path("alternate transform.json")
@@ -65,6 +65,9 @@ class CalibrationStatsTests(unittest.TestCase):
         result = self.stats(relative)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(str(path), result.stdout)
+        self.assertIn("(0,5)", result.stdout)
+        self.assertIn("5.000 um (limit 500 um)", result.stdout)
+        self.assertIn("measured - predicted: X=+3.000, Y=-4.000 um", result.stdout)
         path.write_text("{broken", encoding="utf-8")
         for filename in [relative, self.default]:
             with self.subTest(filename=filename):

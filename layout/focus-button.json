@@ -1,6 +1,15 @@
 {
   "version": 1,
-  "kind": "point",
-  "x": 1647,
-  "y": 916
+  "kind": "click",
+  "box": [
+    1618,
+    888,
+    1678,
+    948
+  ],
+  "offset": [
+    30,
+    28
+  ],
+  "image": "focus-button-7c8c93db42d44a5ba4ad51cb92058583.png"
 }

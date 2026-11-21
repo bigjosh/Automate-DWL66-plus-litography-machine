@@ -1,6 +1,15 @@
 {
   "version": 1,
-  "kind": "point",
-  "x": 600,
-  "y": 318
+  "kind": "click",
+  "box": [
+    564,
+    310,
+    620,
+    323
+  ],
+  "offset": [
+    30,
+    7
+  ],
+  "image": "alignment-tab-15b16f973b9c4cc4ac845dc447786724.png"
 }

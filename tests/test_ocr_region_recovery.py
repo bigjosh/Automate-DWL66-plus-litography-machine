@@ -243,6 +243,27 @@ class OCRRegionRecoveryTests(unittest.TestCase):
         name, crop, text = self.dialog.call_args.args[:3]
         self.assertEqual((name, crop.size, text), ("actual-xy", (20, 10), "X=0, Y=0 um"))
 
+    def test_comparison_details_follow_each_read_in_the_log_and_preview(self):
+        self.reader.side_effect = ["12", "9"]
+        validate = lambda text: f"Difference {int(text) - 10:+d} um"
+        self.assertEqual(self.read(validator=validate), "9")
+        self.assertEqual(self.dialog.call_args.kwargs["detail"], "Difference +2 um")
+        self.assertIsNone(self.dialog.call_args.kwargs["error"])
+        self.assertEqual(self.dialog.call_args.args[2], "12")
+        psl._emit.assert_has_calls([
+            mock.call("OCR 'actual-xy' [1/1]: '12' -- Difference +2 um"),
+            mock.call("OCR 'actual-xy' [1/1]: '9' -- Difference -1 um"),
+        ])
+
+    def test_console_fallback_and_unreviewed_reads_include_comparison_details(self):
+        self.dialog.side_effect = RuntimeError("no dialog")
+        pause = self.patch(psl, "_pause_console", return_value=0)
+        validate = lambda text: "Difference X=+0, Y=+0 um"
+        self.assertEqual(self.read(validator=validate), "X=0, Y=0 um")
+        self.assertIn("Difference X=+0, Y=+0 um", pause.call_args.args[0])
+        self.assertEqual(psl.grabOCRTextLine("actual-xy", validator=validate), "X=0, Y=0 um")
+        self.assertIn("Difference X=+0, Y=+0 um", psl._emit.call_args.args[0])
+
     def test_fresh_validation_failure_after_next_step_cannot_return_success(self):
         self.reader.side_effect = ["X=0, Y=0 um", "X=999, Y=999 um"]
         self.choose("Next Step", "STOP")

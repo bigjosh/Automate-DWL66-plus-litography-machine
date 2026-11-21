@@ -6,7 +6,6 @@ Importing this file has no machine effects. All coordinates/results are in um.
 
 import argparse
 from datetime import datetime, timezone
-from itertools import combinations
 import json
 import math
 import os
@@ -19,8 +18,9 @@ import tempfile
 from batch_state import BatchState
 from dwl_actions import (check_frame, configure_machine_screen, focus, optical_center_find,
                          raise_head, read_xy, restore_stage_frame, send_absolute_move)
-from plate_transform import (VALIDATION_TOLERANCE_UM, fit_similarity_transform, load_plate_calibration,
-                             load_validated_plate_calibration, plate_position, save_calibration)
+from plate_transform import (VALIDATION_TOLERANCE_UM, farthest_disks, fit_similarity_transform,
+                             load_plate_calibration, load_validated_plate_calibration,
+                             plate_position, save_calibration)
 from run_folders import add_run_arguments, run_session
 from xy_readout import TesseractReader
 
@@ -34,7 +34,7 @@ def select_disks(positions):
     """Pick the longest baseline, then the disk farthest from that line."""
     if len(positions) < 3:
         raise ValueError("Calibration requires three noncollinear disks in the run list.")
-    first, second = max(combinations(positions, 2), key=lambda pair: math.dist(*pair))
+    first, second = farthest_disks(positions)
     dr, dc = second[0] - first[0], second[1] - first[1]
 
     def triangle_area(disk):
@@ -94,7 +94,9 @@ def move_to(psl, target, tesseract_cmd):
     command = tuple(round(value) for value in target)
     send_absolute_move(psl, command)
     text, actual = read_xy(psl, tesseract_cmd, expected=command)
-    psl.info(f"Move verified: X={actual[0]:.3f}, Y={actual[1]:.3f} um")
+    dx, dy = actual[0] - command[0], actual[1] - command[1]
+    psl.info(f"Move verified: X={actual[0]:.3f}, Y={actual[1]:.3f} um "
+             f"(read - commanded: X={dx:+.3f}, Y={dy:+.3f} um)")
     return command, text, actual
 
 
@@ -169,7 +171,7 @@ def run_calibration(psl, *, disks, tesseract_cmd, output_dir, spacing=28489.0, t
     save_report(output_dir, report)
     try:
         if transform_file.exists():
-            # Archive across volumes before retiring the old production transform.
+            # Preserve the previous survey in this attempt's report folder.
             shutil.copy2(transform_file, output_dir / BACKUP)
             transform_file.unlink()
         psl.info(f"Calibration disks {disks[0]} and {disks[1]}, validation disk {disks[2]}. "
@@ -186,7 +188,7 @@ def run_calibration(psl, *, disks, tesseract_cmd, output_dir, spacing=28489.0, t
         save_calibration(candidate, fitted, spacing=spacing, calibration_points=anchors, overwrite=False)
         save_report(output_dir, report)
 
-        # Exercise the serialized fit. The production path is still absent.
+        # Use the saved candidate to predict the independent third center.
         saved_spacing, transform = load_plate_calibration(candidate)
         if (saved_spacing, transform) != (spacing, fitted):
             raise ValueError("Saved candidate calibration differs from the measured two-disk fit.")
@@ -198,14 +200,16 @@ def run_calibration(psl, *, disks, tesseract_cmd, output_dir, spacing=28489.0, t
         save_report(output_dir, report)
         raise_head(psl)
         error = validation["error_distance_um"]
+        difference = (f"measured - predicted: X={validation['error_x_um']:+.3f}, "
+                      f"Y={validation['error_y_um']:+.3f} um")
         if error > VALIDATION_TOLERANCE_UM:
             raise ValueError(f"Calibration failed at disk {disks[2]}: center error {error:.3f} um "
-                             f"exceeds {VALIDATION_TOLERANCE_UM:g} um. Results: {output_dir / 'result.json'}")
+                             f"exceeds {VALIDATION_TOLERANCE_UM:g} um ({difference}). "
+                             f"Results: {output_dir / 'result.json'}")
 
         save_calibration(candidate, transform, spacing=spacing, calibration_points=anchors, validation=validation)
         load_validated_plate_calibration(candidate)
-        psl.info(f"Calibration passed at {disks[2]}: dX={validation['error_x_um']:+.3f} um, "
-                 f"dY={validation['error_y_um']:+.3f} um, distance={error:.3f} um. "
+        psl.info(f"Calibration passed at {disks[2]}: {difference}, distance={error:.3f} um. "
                  f"Head raised. Publishing calibration to {transform_file}.")
         save_calibration(transform_file, transform, spacing=spacing, calibration_points=anchors,
                          validation=validation, overwrite=False)
@@ -241,7 +245,7 @@ def main(argv=None):
     parser.add_argument("--spacing", type=positive_spacing, default=28489.0,
                         help="Plate grid spacing in um (default: 28489)")
     parser.add_argument("--output-dir", type=Path, help="New folder for results and screenshots")
-    add_run_arguments(parser)
+    add_run_arguments(parser, calibration=True)
     args = parser.parse_args(argv)
     with run_session(PROJECT, args, calibration=True) as run_dir:
         return calibrate(args, run_dir)

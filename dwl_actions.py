@@ -4,8 +4,8 @@ from decimal import Decimal
 import math
 from pathlib import Path
 
-from xy_readout import (POSITION_TOLERANCE_UM, ReadoutError, parse_xy,
-                        parse_xy_integers, require_xy_position)
+from xy_readout import (POSITION_TOLERANCE_UM, ReadoutError, compare_xy_position,
+                        format_xy_difference, parse_xy, xy_difference)
 
 
 LAYOUT_DIR = Path(__file__).resolve().parent / "layout"
@@ -36,14 +36,17 @@ def click(psl, name, message=None, *, double=False):
 
 def check_stage_position(psl, expected, tesseract_cmd, description="X/Y PASS", *, initial_delay=None):
     """Verify the displayed integer coordinates against the requested stage position."""
-    x, y = expected
+    comparison = ""
+
+    def validate(text, margin):
+        nonlocal comparison
+        _, comparison = compare_xy_position(text, *expected, tolerance=margin)
+        return comparison
+
     text = psl.grabOCRTextLine(
         "actual-xy", tesseract_cmd=tesseract_cmd, review=True, retrycount=5, delay=5,
-        initial_delay=initial_delay, margin=POSITION_TOLERANCE_UM,
-        validator=lambda text, margin: require_xy_position(text, x, y, tolerance=margin))
-    actual_x, actual_y = parse_xy_integers(text)
-    psl.info(f"{description}: OCR={text!r}; integer readout X={actual_x}, Y={actual_y} um; "
-             f"expected X={x}, Y={y} um")
+        initial_delay=initial_delay, margin=POSITION_TOLERANCE_UM, validator=validate)
+    psl.info(f"{description}: OCR={text!r}; {comparison}")
 
 
 def restore_stage_frame(psl, tesseract_cmd):
@@ -73,8 +76,6 @@ def send_absolute_move(psl, command):
 
 def focus(psl, message="Focus on this disk"):
     click(psl, "focus-button", message)
-    psl.wait(5)
-    check_frame(psl, "focus-executing", 0.96, delay=10, retrycount=24)
     check_frame(psl, "focus-ready", 0.96, delay=10, retrycount=24)
 
 
@@ -86,17 +87,16 @@ def raise_head(psl, message="Raise the head after measuring this disk"):
 def optical_center_find(psl):
     """Run the selected optical center find on an already focused disk."""
     click(psl, "alignment-tab")
+    check_frame(psl, "alignment-FindWafterCenterOptical", 0.999)
+    # check_frame(psl, "alignment-check-setzero-is-false", 0.999)
     check_frame(psl, "alignment-execute-image", 0.999)
-    click(psl, "near-execute", "Focus the alignment panel next to Execute")
     click(psl, "alignment-execute")
     psl.wait(1)
     check_frame(psl, "check-alignment-confirm", 0.99, delay=10, retrycount=24)
-    click(psl, "pre-click-alignment-confirm")
     click(psl, "click-alignment-confirm", "Confirm Find wafer center optical")
     psl.wait(1)
-    check_frame(psl, "alignment-button-pushed", 0.9, delay=10, retrycount=10)
     check_frame(psl, "alignment-button-popped", 0.9, delay=10, retrycount=10)
-    psl.wait(5)
+    psl.wait(2)
 
 
 def read_xy(psl, tesseract_cmd, *, expected=None, center_near=None,
@@ -106,23 +106,30 @@ def read_xy(psl, tesseract_cmd, *, expected=None, center_near=None,
         values = parse_xy(text)
         if not all(math.isfinite(float(value)) for value in values):
             raise ReadoutError("X/Y readout is outside the finite numeric range.")
+        details = []
         if expected is not None:
             per_axis_limit = Decimal(str(margin))
-            errors = [abs(value - Decimal(str(target)))
-                      for value, target in zip(values, expected)]
-            if any(error > per_axis_limit for error in errors):
+            dx, dy = xy_difference(values, expected)
+            move_diff = f"diff (read - commanded) {format_xy_difference(dx, dy)}"
+            if dx.copy_abs() > per_axis_limit or dy.copy_abs() > per_axis_limit:
                 raise ReadoutError(
-                    f"Move check failed: read {values}, commanded {expected}; "
+                    f"Move check failed: read X={values[0]}, Y={values[1]} um; "
+                    f"commanded X={expected[0]}, Y={expected[1]} um; {move_diff}; "
                     f"must be within +/-{per_axis_limit} um on each axis.")
+            details.append(move_diff)
         if center_near is not None:
             shift = math.dist(tuple(map(float, values)), center_near)
+            dx, dy = xy_difference(values, center_near)
+            details.append(f"diff (found center - commanded) {format_xy_difference(dx, dy)}; "
+                           f"radial distance {shift:.1f} um")
             radial_limit = margin if expected is None else max_center_shift
             if shift >= radial_limit:
                 raise ReadoutError(
-                    f"Found center is {shift:.1f} um from the commanded position "
+                    f"Center check failed: {'; '.join(details)} "
                     f"(radial distance must be less than {radial_limit} um). Check that "
                     "center finding did not zero/change the coordinates and that "
                     "the intended disk was found.")
+        return "; ".join(details)
 
     text = psl.grabOCRTextLine(
         "actual-xy", tesseract_cmd=tesseract_cmd, review=True, validator=validate,

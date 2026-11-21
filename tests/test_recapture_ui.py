@@ -1,5 +1,6 @@
 """Recapture dialog checks without opening Tk, a browser, or the machine UI."""
 
+from itertools import count
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -19,7 +20,8 @@ class FakeTclError(Exception):
 class Widget:
     def __init__(self, harness, kind, parent=None, **options):
         self.harness, self.kind, self.options = harness, kind, options
-        self.children, self.items = [], []
+        self.children, self._items = [], {}
+        self.item_ids = count(1)
         self.bindings, self.protocols = {}, {}
         self.destroy_count = 0
         self.destroyed = False
@@ -48,23 +50,65 @@ class Widget:
     def winfo_screenheight(self):
         return 900
 
-    def bind(self, event, callback):
+    def bind(self, event, callback, add=None):
         self.bindings[event] = callback
 
     def protocol(self, name, callback):
         self.protocols[name] = callback
 
+    @property
+    def items(self):
+        return self._items.values()
+
+    def visible_items(self):
+        return [item for item in self.items if item[2].get("state") != "hidden"]
+
+    def _create(self, kind, coords, options):
+        item_id = next(self.item_ids)
+        self._items[item_id] = (kind, coords, options)
+        return item_id
+
     def create_image(self, *coords, **options):
-        self.items.append(("image", coords, options))
+        return self._create("image", coords, options)
 
     def create_line(self, *coords, **options):
-        self.items.append(("line", coords, options))
+        return self._create("line", coords, options)
 
     def create_rectangle(self, *coords, **options):
-        self.items.append(("rectangle", coords, options))
+        return self._create("rectangle", coords, options)
+
+    def _matching_ids(self, tag):
+        if isinstance(tag, int):
+            return [tag]
+        matches = []
+        for item_id, (_, _, options) in self._items.items():
+            tags = options.get("tags", ())
+            if tag in (tags.split() if isinstance(tags, str) else tags):
+                matches.append(item_id)
+        return matches
+
+    def coords(self, tag, *coords):
+        for item_id in self._matching_ids(tag):
+            kind, _, options = self._items[item_id]
+            self._items[item_id] = (kind, coords, options)
+
+    def itemconfigure(self, tag, **options):
+        for item_id in self._matching_ids(tag):
+            self._items[item_id][2].update(options)
+
+    itemconfig = itemconfigure
 
     def delete(self, tag):
-        self.items = [item for item in self.items if item[2].get("tags") != tag]
+        for item_id in self._matching_ids(tag):
+            del self._items[item_id]
+
+    def after(self, delay, callback):
+        token = next(self.harness.timer_ids)
+        self.harness.timers[token] = (delay, callback)
+        return token
+
+    def after_cancel(self, token):
+        del self.harness.timers[token]
 
     def xview(self, *args):
         return (0, 1)
@@ -85,11 +129,14 @@ class Widget:
         self.destroyed = True
         for child in self.children:
             child.destroy()
+        if "<Destroy>" in self.bindings:
+            self.bindings["<Destroy>"](SimpleNamespace(widget=self))
 
 
 class Harness:
     def __init__(self):
         self.widgets, self.roots = [], []
+        self.timers, self.timer_ids = {}, count(1)
         self.action = lambda root: root.destroy()
         self.tk = SimpleNamespace(TclError=FakeTclError)
         for kind in ("Frame", "Label", "Canvas", "Scrollbar", "Button"):
@@ -116,6 +163,15 @@ class Harness:
         return [next(item[2]["image"] for item in canvas.items if item[0] == "image")
                 for canvas in self.image_canvases()]
 
+    def tick(self):
+        if not self.timers:
+            raise AssertionError("Expected a blink timer")
+        for token in list(self.timers):
+            delay, callback = self.timers.pop(token)
+            if delay <= 0:
+                raise AssertionError("Expected a nonzero blink delay")
+            callback()
+
 
 class RecaptureUITests(unittest.TestCase):
     def setUp(self):
@@ -135,6 +191,7 @@ class RecaptureUITests(unittest.TestCase):
     def assert_cleanup(self):
         self.assertTrue(self.h.roots)
         self.assertTrue(all(widget.destroyed for widget in self.h.widgets))
+        self.assertFalse(self.h.timers)
 
     def assert_same_pixels(self, actual, expected):
         self.assertEqual(actual.size, expected.size)
@@ -201,6 +258,25 @@ class RecaptureUITests(unittest.TestCase):
                 self.assertFalse(layouts.confirm_reference("focus-ready", self.new, previous=self.old))
                 self.assert_cleanup()
 
+    def test_click_confirmation_blinks_over_the_exact_crop(self):
+        source = self.new.copy()
+
+        def inspect(root):
+            canvas, = self.h.image_canvases()
+            initial = [(kind, coords) for kind, coords, _ in canvas.visible_items()]
+            self.assertIn("line", [kind for kind, _ in initial])
+            self.h.tick()
+            self.assertEqual([kind for kind, _, _ in canvas.visible_items()], ["image"])
+            self.assert_same_pixels(self.h.images()[0], source)
+            self.h.tick()
+            self.assertEqual([(kind, coords) for kind, coords, _ in canvas.visible_items()], initial)
+            self.h.click("Use as expected reference")
+
+        self.h.action = inspect
+        self.assertTrue(layouts.confirm_reference("move-absolute", self.new, click_offset=(20, 10)))
+        self.assert_same_pixels(self.new, source)
+        self.assert_cleanup()
+
     def test_image_render_failure_closes_dialog_and_preserves_exception(self):
         for dialog in (lambda: layouts.prompt_recapture("focus-ready", self.old),
                        lambda: layouts.confirm_reference("focus-ready", self.new, previous=self.old)):
@@ -236,6 +312,42 @@ class RecaptureUITests(unittest.TestCase):
                 self.h.action = action
                 self.assertIsNone(layouts.pick_on_image(self.new, "Capture", "rect", reference=self.old))
                 self.assert_cleanup()
+
+    def test_picker_blinks_pointer_and_saved_click_while_drag_outline_stays_visible(self):
+        source = self.new.copy()
+        start = SimpleNamespace(x=5, y=7)
+        end = SimpleNamespace(x=75, y=30)
+
+        def inspect(root):
+            canvas, = self.h.image_canvases()
+            canvas.bindings["<Button-1>"](start)
+            canvas.bindings["<Motion>"](SimpleNamespace(x=65, y=25))
+            line_colors = {style["fill"] for kind, _, style in canvas.visible_items() if kind == "line"}
+            self.assertTrue({"yellow", "#ff3333"} <= line_colors)
+
+            def assert_only_capture_and_band(x, y):
+                self.assertEqual([(kind, coords) for kind, coords, _ in canvas.visible_items()],
+                                 [("image", (0, 0)), ("rectangle", (start.x, start.y, x, y))])
+                self.assert_same_pixels(self.h.images()[0], source)
+
+            self.h.tick()
+            assert_only_capture_and_band(65, 25)
+            canvas.bindings["<Motion>"](end)
+            assert_only_capture_and_band(end.x, end.y)
+            self.h.tick()
+            visible = canvas.visible_items()
+            pointer = [coords for kind, coords, style in visible
+                       if kind == "line" and style["fill"] == "#ff3333"]
+            self.assertCountEqual(pointer, [(end.x, 0, end.x, self.new.height),
+                                            (0, end.y, self.new.width, end.y)])
+            self.assertIn("yellow", [style["fill"] for kind, _, style in visible if kind == "line"])
+            canvas.bindings["<ButtonRelease-1>"](end)
+
+        self.h.action = inspect
+        bounds = layouts.pick_on_image(self.new, "Capture", "rect", marker=(30, 15))
+        self.assertEqual(bounds, (start.x, start.y, end.x, end.y))
+        self.assert_same_pixels(self.new, source)
+        self.assert_cleanup()
 
     def test_picker_reference_render_failure_closes_partly_built_window(self):
         calls = []

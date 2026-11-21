@@ -1,6 +1,15 @@
 {
   "version": 1,
-  "kind": "point",
-  "x": 337,
-  "y": 316
+  "kind": "click",
+  "box": [
+    319,
+    310,
+    344,
+    325
+  ],
+  "offset": [
+    10,
+    6
+  ],
+  "image": "job-tab-94a16f9ea22a4e45aa1ebf5c26131081.png"
 }

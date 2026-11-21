@@ -1,6 +1,15 @@
 {
   "version": 1,
-  "kind": "point",
-  "x": 1265,
-  "y": 814
+  "kind": "click",
+  "box": [
+    1265,
+    830,
+    1299,
+    841
+  ],
+  "offset": [
+    20,
+    6
+  ],
+  "image": "laser-confirm-94e24b6ecec340e9a9edb6a6e28fa888.png"
 }

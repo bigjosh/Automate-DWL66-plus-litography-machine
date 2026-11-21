@@ -616,8 +616,8 @@ def frameGrab(x1, y1=None, x2=None, y2=None):
     return _frame_and_full(x1, y1, x2, y2)[0]
 
 
-def _check_ocr_text(text, validator=None, margin=None):
-    text = text.strip()
+def _validate_ocr_text(text, validator=None, margin=None):
+    """Validate a stripped OCR line, returning optional details for the operator."""
     if not text:
         raise OCRError("OCR returned no text for the selected rectangle.")
     if len(text.splitlines()) != 1:
@@ -626,7 +626,9 @@ def _check_ocr_text(text, validator=None, margin=None):
         result = validator(text) if margin is None else validator(text, margin)
         if result is False:
             raise OCRError("OCR text did not pass validation.")
-    return text
+        if isinstance(result, str):
+            return result
+    return None
 
 
 def _ocr_preview(reader, pixels, validator=None, margin=None):
@@ -634,20 +636,22 @@ def _ocr_preview(reader, pixels, validator=None, margin=None):
     text = ""
     try:
         text = reader(pixels).strip()
-        return _check_ocr_text(text, validator, margin), None
+        return text, _validate_ocr_text(text, validator, margin), None
     except OCRError as exc:
-        return text, str(exc)
+        return text, None, str(exc)
 
 
-def _ocr_choice(name, pixels, text, *, error=None, buttons, require_preview=False):
+def _ocr_choice(name, pixels, text, *, detail=None, error=None, buttons, require_preview=False):
     try:
-        return _layouts.ocr_dialog(name, pixels, text, error=error, buttons=buttons)
+        return _layouts.ocr_dialog(name, pixels, text, detail=detail, error=error, buttons=buttons)
     except Exception:
         if require_preview:
             # Saving geometry requires seeing the candidate crop, not just its
             # OCR text in a console after an image-dialog failure.
             raise
-        message = "OCR '%s': %r%s" % (name, text, "\n" + error if error else "")
+        message = f"OCR {name!r}: {text!r}"
+        if error or detail:
+            message += f"\n{error or detail}"
         _emit(message)
         return _pause_console(message, buttons, close_choice=len(buttons) - 1)
 
@@ -670,7 +674,7 @@ def _edit_ocr_region(name, reader, check_context):
         crop = screenshot.crop(tuple(box))
         # Confirm readable text and geometry here. The caller's value checks
         # run on a fresh reading after the operator leaves the paused step.
-        text, error = _ocr_preview(reader, crop)
+        text, _, error = _ocr_preview(reader, crop)
         buttons = (("Select again", "Cancel") if error is not None else
                    ("Save OCR area", "Select again", "Cancel"))
         choice = _ocr_choice(name, crop, text, error=error, buttons=buttons,
@@ -731,10 +735,11 @@ def _review_ocr_text_line(name, reader, validator, attempts, delay, initial_dela
             pixels, screen = _frame_and_full(*box)
             selected.check_viewport(screen.size)
             check_context()
-            text, error = _ocr_preview(reader, pixels, validator, margin)
+            text, detail, error = _ocr_preview(reader, pixels, validator, margin)
             check_context()
+            message = error if error is not None else detail
             _emit(f"OCR {name!r} [{attempt}/{attempts}]: {text!r}"
-                  + (" -- " + error if error is not None else ""))
+                  + (" -- " + message if message else ""))
             if error is None:
                 break
         initial_delay = delay
@@ -750,7 +755,7 @@ def _review_ocr_text_line(name, reader, validator, attempts, delay, initial_dela
                 alarm_error = error
             else:
                 buttons = ("Next Step", "Run Continuously", "Redefine OCR area", "STOP")
-                action = buttons[_ocr_choice(name, pixels, text, buttons=buttons)]
+                action = buttons[_ocr_choice(name, pixels, text, detail=detail, buttons=buttons)]
             if action == "Show capture region":
                 try:
                     _layouts.show_ocr_region(name, screen, box)
@@ -816,7 +821,8 @@ def grabOCRTextLine(x1, y1=None, x2=None, y2=None, *, tesseract_cmd=None,
     Leading/trailing whitespace is removed; internal spacing, signs, decimal
     points and other recognized characters are preserved. This function does
     not parse values itself. Optional validator(text) must raise OCRError or
-    return False to reject a reading; its other return values are ignored.
+    return False to reject a reading. A returned string describes a successful
+    check in the log and in the review dialog. Other return values are ignored.
     Supplying a nonnegative margin in µm calls validator(text, margin).
     retrycount is the total number of attempts (0 or 1 selects one).
     delay is in seconds before each fresh capture. initial_delay overrides
@@ -855,7 +861,11 @@ def grabOCRTextLine(x1, y1=None, x2=None, y2=None, *, tesseract_cmd=None,
     for attempt in _ocr_attempts(attempts, delay, initial_delay):
         pixels = frameGrab(x1, y1, x2, y2)
         try:
-            return _check_ocr_text(reader(pixels), validator, margin)
+            text = reader(pixels).strip()
+            detail = _validate_ocr_text(text, validator, margin)
+            if detail:
+                _emit(f"OCR [{attempt}/{attempts}]: {text!r} -- {detail}")
+            return text
         except OCRError as exc:
             if attempt == attempts:
                 raise

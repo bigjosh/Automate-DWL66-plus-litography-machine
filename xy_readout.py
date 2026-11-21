@@ -84,14 +84,29 @@ def parse_xy_integers(text: str) -> tuple[Decimal, Decimal]:
     return values["X"], values["Y"]
 
 
-def require_xy_position(text, expected_x, expected_y, *,
-                        tolerance=POSITION_TOLERANCE_UM) -> tuple[Decimal, Decimal]:
-    """Check the integer X/Y readouts against the given per-axis tolerance in µm.
+def xy_difference(actual, expected):
+    """Return exact Decimal differences (OCR minus target) on both axes."""
+    x, y = actual
+    target_x, target_y = (Decimal(str(value)) for value in expected)
+    values = (x, y, target_x, target_y)
+    highest_place = max(value.adjusted() for value in values)
+    lowest_place = min(value.as_tuple().exponent for value in values)
+    with localcontext() as context:
+        context.prec = max(context.prec, highest_place - lowest_place + 3)
+        return x - target_x, y - target_y
 
-    Any parse or position error raises ReadoutError, allowing the production
-    script to stop before focusing. Commands must be finite integers. The
-    limit is inclusive on each axis. Fractions are discarded toward zero.
-    """
+
+def format_xy_difference(dx, dy):
+    """Show direction explicitly, including +0 for an exact match."""
+    if dx.is_zero():
+        dx = dx.copy_abs()
+    if dy.is_zero():
+        dy = dy.copy_abs()
+    return f"X={dx:+f}, Y={dy:+f} um"
+
+
+def compare_xy_position(text, expected_x, expected_y, *, tolerance=POSITION_TOLERANCE_UM):
+    """Return the integer readout and comparison message, or raise on a mismatch."""
     actual_x, actual_y = parse_xy_integers(text)
     try:
         target_x, target_y = Decimal(str(expected_x)), Decimal(str(expected_y))
@@ -107,18 +122,21 @@ def require_xy_position(text, expected_x, expected_y, *,
         raise ReadoutError("Position tolerance must be finite and nonnegative.") from exc
     if not tolerance.is_finite() or tolerance < 0:
         raise ReadoutError("Position tolerance must be finite and nonnegative.")
-    values = (actual_x, actual_y, target_x, target_y)
-    # Keep subtraction exact even if a caller reduced the Decimal precision.
-    highest_place = max(value.adjusted() for value in values)
-    lowest_place = min(value.as_tuple().exponent for value in values)
-    with localcontext() as context:
-        context.prec = max(context.prec, highest_place - lowest_place + 3)
-        dx, dy = actual_x - target_x, actual_y - target_y
-        if abs(dx) > tolerance or abs(dy) > tolerance:
-            raise ReadoutError(
-                f"X/Y position check FAILED: expected X={target_x}, Y={target_y} um; "
-                f"integer readout X={actual_x}, Y={actual_y} um; "
-                f"error X={dx}, Y={dy} um (limit +/-{tolerance} um on EACH axis); "
-                f"OCR text: {text!r}"
-            )
-    return actual_x, actual_y
+    actual = actual_x, actual_y
+    dx, dy = xy_difference(actual, (target_x, target_y))
+    message = (f"expected X={target_x}, Y={target_y} um; "
+               f"integer readout X={actual_x}, Y={actual_y} um; "
+               f"diff (actual - expected) {format_xy_difference(dx, dy)}")
+    if dx.copy_abs() > tolerance or dy.copy_abs() > tolerance:
+        raise ReadoutError(
+            f"X/Y position check FAILED: {message} (limit +/-{tolerance} um on EACH axis); "
+            f"OCR text: {text!r}"
+        )
+    return actual, message
+
+
+def require_xy_position(text, expected_x, expected_y, *,
+                        tolerance=POSITION_TOLERANCE_UM) -> tuple[Decimal, Decimal]:
+    """Return the checked integer X/Y readouts using an inclusive per-axis limit in µm."""
+    actual, _ = compare_xy_position(text, expected_x, expected_y, tolerance=tolerance)
+    return actual

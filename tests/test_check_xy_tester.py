@@ -238,6 +238,7 @@ class CheckXYWorkflowTests(unittest.TestCase):
         offsets = [("0.3", "0", True), ("3", "-3", True), ("-3", "3", True),
                    ("3.0001", "0", False), ("0", "-3.0001", False),
                    ("2.9", "2.9", True)] * 2
+        offsets[-1] = ("3.25", "-4.5", False)
 
         def read_offset(crop):
             dx, dy, expected = offsets[len(self.psl.moves) - 1]
@@ -248,9 +249,10 @@ class CheckXYWorkflowTests(unittest.TestCase):
         ui = FakeUI(self.psl, self.events)
         rows = self.run_workflow(ui, read_offset)
         self.assertEqual([row["passed"] for row in rows], [entry[2] for entry in offsets])
-        for row, (dx, dy, expected) in zip(rows, offsets):
-            self.assertEqual(abs(Decimal(str(row["error_x"]))), abs(Decimal(dx)))
-            self.assertEqual(abs(Decimal(str(row["error_y"]))), abs(Decimal(dy)))
+        for row, message, (dx, dy, expected) in zip(rows, self.psl.messages, offsets):
+            self.assertEqual(Decimal(row["error_x"]), Decimal(dx))
+            self.assertEqual(Decimal(row["error_y"]), Decimal(dy))
+            self.assertIn(f"Error (actual - commanded): X={Decimal(dx):+f}, Y={Decimal(dy):+f} um", message)
         self.assertIn("FAIL", "\n".join(self.psl.messages))
 
     def test_unreadable_text_fails_without_invented_coordinates_and_can_continue(self):
@@ -266,6 +268,7 @@ class CheckXYWorkflowTests(unittest.TestCase):
         self.assertTrue(rows[0]["reason"])
         self.assertTrue(all(rows[0][key] is None for key in
                             ("actual_x", "actual_y", "error_x", "error_y")))
+        self.assertIn("Error (actual - commanded): unavailable", self.psl.messages[0])
         self.assertEqual(len(ui.reviews), 12)
         self.assertTrue(all(row["passed"] for row in rows[1:]))
 

@@ -453,12 +453,30 @@ def prompt_definition(name, kind):
     return result["accepted"]
 
 
-def _draw_click_marker(canvas, x, y):
+def _blink_crosshairs(canvas, *other_views):
+    """Blink canvas overlays together while their dialog is open."""
+    visible = True
+
+    def toggle():
+        nonlocal visible, timer
+        visible = not visible
+        for view in (canvas, *other_views):
+            view.itemconfigure("crosshair", state="normal" if visible else "hidden")
+        timer = canvas.after(500, toggle)
+
+    timer = canvas.after(500, toggle)
+    canvas.bind("<Destroy>", lambda event: canvas.after_cancel(timer), add="+")
+
+
+def _draw_click_marker(canvas, x, y, *, large=False):
+    # Leave the center of the large preview marker open to show the target pixel.
+    inner, outer, width = (5, 20, 2) if large else (2, 11, 1)
     for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-        line = (x + 2 * dx, y + 2 * dy, x + 11 * dx, y + 11 * dy)
-        canvas.create_line(*line, fill="black", width=3)
-        canvas.create_line(*line, fill="yellow", width=1)
-    canvas.create_rectangle(x, y, x + 1, y + 1, outline="yellow")
+        line = (x + inner * dx, y + inner * dy, x + outer * dx, y + outer * dy)
+        canvas.create_line(*line, fill="black", width=2 * width + 1, tags="crosshair")
+        canvas.create_line(*line, fill="yellow", width=width, tags="crosshair")
+    if not large:
+        canvas.create_rectangle(x, y, x + 1, y + 1, outline="yellow", tags="crosshair")
 
 
 def _image_preview(parent, img, *, max_width, max_height, marker=None):
@@ -483,6 +501,7 @@ def _image_preview(parent, img, *, max_width, max_height, marker=None):
     canvas.image = photo
     if marker is not None:
         _draw_click_marker(canvas, *marker)
+        _blink_crosshairs(canvas)
     return frame
 
 
@@ -503,11 +522,8 @@ def show_click_preview(name, img, point):
         canvas.pack(padx=8)
         canvas.image = ImageTk.PhotoImage(view, master=root)
         canvas.create_image(0, 0, image=canvas.image, anchor="nw")
-        # Leave the center open so the operator can see the exact target.
-        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            line = (cx + 5 * dx, cy + 5 * dy, cx + 20 * dx, cy + 20 * dy)
-            canvas.create_line(*line, fill="black", width=5)
-            canvas.create_line(*line, fill="yellow", width=2)
+        _draw_click_marker(canvas, cx, cy, large=True)
+        return canvas
 
     try:
         root.resizable(False, False)
@@ -517,8 +533,8 @@ def show_click_preview(name, img, point):
                  font=("Segoe UI", 12, "bold")).pack(padx=8, pady=4)
         overview = img.copy()
         overview.thumbnail((max_width, max(1, int(screen_height * 0.55))), Image.LANCZOS)
-        show_marked(overview, int((x + 0.5) * overview.width / img.width),
-                    int((y + 0.5) * overview.height / img.height))
+        overview_canvas = show_marked(overview, int((x + 0.5) * overview.width / img.width),
+                                      int((y + 0.5) * overview.height / img.height))
 
         tk.Label(root, text="Click target at 3×").pack(pady=(6, 2))
         # Pad at viewport edges to keep the clicked pixel centered even in a corner.
@@ -527,7 +543,8 @@ def show_click_preview(name, img, point):
         detail = Image.new("RGB", (2 * half_width + 1, 2 * half_height + 1), "#555555")
         detail.paste(img, (half_width - x, half_height - y))
         detail = detail.resize((detail.width * 3, detail.height * 3), Image.NEAREST)
-        show_marked(detail, detail.width // 2, detail.height // 2)
+        detail_canvas = show_marked(detail, detail.width // 2, detail.height // 2)
+        _blink_crosshairs(overview_canvas, detail_canvas)
 
         tk.Button(root, text="Back to step", command=root.destroy).pack(pady=6)
         root.bind("<Escape>", lambda event: root.destroy())
@@ -627,7 +644,7 @@ def prompt_ocr_margin(name, current_margin):
             pass
 
 
-def ocr_dialog(name, crop, text, *, error=None, alarm=False,
+def ocr_dialog(name, crop, text, *, detail=None, error=None, alarm=False,
                buttons=("Next Step", "Run Continuously", "Redefine OCR area", "STOP")):
     """Review an OCR crop/result and return the selected button's index.
 
@@ -682,9 +699,11 @@ def ocr_dialog(name, crop, text, *, error=None, alarm=False,
         scrollbar.pack(side="right", fill="y")
         text_view.insert("1.0", repr(text) if text is not None else "(No OCR text returned)")
         text_view.configure(state="disabled")
-        if error is not None:
-            tk.Label(root, text=str(error), fg="#b00020", font=("Segoe UI", 11),
-                     justify="left", wraplength=700).pack(padx=15, pady=(10, 0), anchor="w")
+        if error is not None or detail:
+            style = {"fg": "#b00020"} if error is not None else {}
+            tk.Label(root, text=str(error) if error is not None else detail,
+                     font=("Segoe UI", 11), justify="left", wraplength=700,
+                     **style).pack(padx=15, pady=(10, 0), anchor="w")
 
         row = tk.Frame(root)
         row.pack(padx=15, pady=15, anchor="e")
@@ -779,7 +798,7 @@ def confirm_reference(name, crop, *, previous=None, click_offset=None):
                         "Confirm the new image shows the correct expected state. "
                         "Previews are 1:1; scroll if needed.") % (name, crop.width, crop.height)
         if click_offset is not None:
-            instructions += "\nThe yellow marker shows where the click will land within this image."
+            instructions += "\nThe blinking yellow marker shows where the click will land within this image."
         tk.Label(root, text=instructions, justify="left", wraplength=620,
                  font=("Segoe UI", 11)).pack(padx=15, pady=12)
         previews = tk.Frame(root)
@@ -845,17 +864,21 @@ def pick_on_image(img, title, mode, *, reference=None, marker=None):
         instructions = ("Click the target spot. Esc cancels." if mode == "point" else
                         "Drag a rectangle around the region. Esc cancels.")
         if marker is not None:
-            instructions += " Yellow marks the previously saved click."
+            instructions += " The blinking yellow marker shows the previously saved click."
         status = tk.Label(root, text=instructions, font=("Segoe UI", 11), anchor="w")
         status.pack(fill="x", padx=6, pady=3)
         photo = ImageTk.PhotoImage(display, master=root)
         canvas = tk.Canvas(root, width=display.width, height=display.height,
-                           highlightthickness=0, cursor="crosshair")
+                           highlightthickness=0, cursor="arrow")
         canvas.pack()
         canvas.create_image(0, 0, image=photo, anchor="nw")
         if marker is not None:
             _draw_click_marker(canvas, int((marker[0] + 0.5) * scale_x),
                                int((marker[1] + 0.5) * scale_y))
+        # Keep both guides off-canvas until the pointer moves into the image.
+        vertical = canvas.create_line(-1, 0, -1, display.height, fill="#ff3333", tags="crosshair")
+        horizontal = canvas.create_line(0, -1, display.width, -1, fill="#ff3333", tags="crosshair")
+        _blink_crosshairs(canvas)
         if reference is not None:
             reference_frame = tk.Frame(root)
             reference_frame.pack(fill="x", padx=6, pady=(6, 3))
@@ -875,9 +898,8 @@ def pick_on_image(img, title, mode, *, reference=None, marker=None):
 
         def on_motion(event):
             x, y = to_image(event.x, event.y)
-            canvas.delete("cross")
-            canvas.create_line(event.x, 0, event.x, display.height, fill="#ff3333", tags="cross")
-            canvas.create_line(0, event.y, display.width, event.y, fill="#ff3333", tags="cross")
+            canvas.coords(vertical, event.x, 0, event.x, display.height)
+            canvas.coords(horizontal, 0, event.y, display.width, event.y)
             status.config(text="%s   (x=%d, y=%d)" % (instructions, x, y))
             if mode == "rect" and "start" in drag:
                 canvas.delete("band")

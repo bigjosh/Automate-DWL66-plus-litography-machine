@@ -1,6 +1,7 @@
 """Track exposure starts for one 6×6 plate in two operator-editable text files."""
 
 from contextlib import contextmanager
+import json
 import os
 from pathlib import Path
 import re
@@ -96,6 +97,33 @@ class BatchState:
     def _sync(self):
         self._stream.flush()
         os.fsync(self._stream.fileno())
+
+    def calibration_checkpoint(self):
+        """Read the latest automatic-calibration comment in this batch, if any."""
+        prefix = "# auto-calibration "
+        for line in reversed(self._expected.decode("utf-8-sig").splitlines()):
+            line = line.strip()
+            if line.startswith(prefix.rstrip()):
+                try:
+                    record = json.loads(line[len(prefix):])
+                    if not isinstance(record, dict):
+                        raise ValueError("expected a JSON object")
+                    return record
+                except ValueError as exc:
+                    raise ValueError(f"Invalid calibration checkpoint in {self.skip_path}") from exc
+        return None
+
+    def save_calibration_checkpoint(self, record):
+        """Append and sync one full snapshot without rewriting exposure records."""
+        if self._in_flight or self._current_bytes() != self._expected:
+            raise RuntimeError(f"Cannot save calibration progress: check {self.skip_path} for changes.")
+        line = "# auto-calibration " + json.dumps(record, allow_nan=False, separators=(",", ":")) + "\n"
+        data = line.encode("utf-8")
+        if self._expected and not self._expected.endswith(b"\n"):
+            data = b"\n" + data
+        self._stream.write(data)
+        self._sync()
+        self._expected += data
 
     @contextmanager
     def starting_exposure(self, position):

@@ -12,6 +12,8 @@ from batch_state import lock_batch_file, read_positions
 
 
 STAMP_FORMAT = "%y%m%d %H%M%S"
+WRITE_CALIBRATION = "plate-write-calibration.json"
+SURVEY_CALIBRATION = "plate-calibration.json"
 
 
 @contextmanager
@@ -91,13 +93,14 @@ def create_run(project):
                 stamp += timedelta(seconds=1)
 
 
-def add_run_arguments(parser):
+def add_run_arguments(parser, *, calibration=False):
+    transform_name = SURVEY_CALIBRATION if calibration else WRITE_CALIBRATION
     parser.add_argument("--latest-run", action="store_true",
                         help="Pin the newest carrier run (always enabled by the batch launchers)")
     parser.add_argument("--run-list", type=Path, help="Disk list (default: latest run's run-list.txt)")
     parser.add_argument("--skip-list", type=Path, help="Exposure record (default: latest run's skip-list.txt)")
     parser.add_argument("--transform-file", type=Path,
-                        help="Verified calibration (default: latest run's plate-calibration.json)")
+                        help=f"Calibration file (default: latest run's {transform_name})")
 
 
 @contextmanager
@@ -110,8 +113,9 @@ def run_session(project, args, *, calibration=False):
         return
 
     with active_run(project) as folder:
+        transform_name = SURVEY_CALIBRATION if calibration else WRITE_CALIBRATION
         for field, name in (("run_list", "run-list.txt"), ("skip_list", "skip-list.txt"),
-                            ("transform_file", "plate-calibration.json")):
+                            ("transform_file", transform_name)):
             supplied = getattr(args, field)
             if calibration and field == "run_list" and supplied is not None:
                 continue  # A separate survey list can provide three mounted disks.
@@ -135,7 +139,7 @@ def main(argv=None):
         print(f"Could not start a new run: {exc}", file=sys.stderr)
         return 1
     print(f"New run: {folder}")
-    print("Run calibrate.bat for this carrier, then run.bat to expose.")
+    print("Start run.bat to center and expose the two calibration disks, then write the remaining disks.")
     return 0
 
 

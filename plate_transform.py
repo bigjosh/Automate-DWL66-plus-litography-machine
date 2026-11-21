@@ -8,6 +8,7 @@ and translation. Legacy rigid fits keep scale fixed at one.
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from itertools import combinations
 import json
 import math
 import os
@@ -16,6 +17,7 @@ import tempfile
 
 
 VALIDATION_TOLERANCE_UM = 500.0  # Radial error at the independent third disk.
+TWO_EXPOSED_ANCHORS = "two_exposed_anchors"
 
 
 def _finite(value, label):
@@ -51,6 +53,14 @@ def plate_position(row, col, spacing=28489.0):
     if spacing <= 0:
         raise ValueError("spacing must be positive")
     return _point(((row - 2.5) * spacing, -(col - 2.5) * spacing), "plate position")
+
+
+def farthest_disks(pending):
+    """Pick the longest available baseline, resolving ties in run-list order."""
+    positions = tuple(pending)
+    if len(positions) < 2:
+        return positions
+    return max(combinations(positions, 2), key=lambda pair: math.dist(*pair))
 
 
 @dataclass(frozen=True)
@@ -162,7 +172,7 @@ def _json_number(value, label):
 
 
 def _json_point(value, label):
-    if not isinstance(value, list) or len(value) != 2:
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
         raise ValueError(f"{label} must be an array of two numbers")
     return tuple(_json_number(item, label) for item in value)
 
@@ -234,9 +244,9 @@ def save_calibration(path, transform, *, spacing, calibration_points, validation
 
     ``calibration_points`` contains exactly two caller-defined dictionaries.
     ``validation`` may be omitted/pending while the tester reloads this file
-    for an independent third-corner measurement. Saving does not approve the
-    fit for production; required accuracy remains a caller policy. Set
-    overwrite=False to publish only if the destination is still absent.
+    for an independent third-corner measurement. A finished batch fit uses
+    {"method": TWO_EXPOSED_ANCHORS} after both anchor exposures finish.
+    Set overwrite=False to publish only if the destination is still absent.
     """
     if not isinstance(transform, RigidTransform):
         raise ValueError("transform must be a RigidTransform or SimilarityTransform")
@@ -257,6 +267,8 @@ def save_calibration(path, transform, *, spacing, calibration_points, validation
     if similarity:
         document["scale"] = transform.scale
     _validate_calibration(document)
+    if validation and validation.get("method") == TWO_EXPOSED_ANCHORS:
+        _verify_measurements(document, transform)
     try:
         serialized = json.dumps(document, indent=2, allow_nan=False) + "\n"
     except (TypeError, ValueError) as exc:
@@ -304,48 +316,70 @@ def load_plate_calibration(path):
     return float(document["spacing_um"]), transform
 
 
+def _check_measured_fit(document, transform):
+    anchors = document["calibration_points"]
+    disks = [(point.get("row"), point.get("col")) for point in anchors]
+    nominal = [plate_position(*disk, document["spacing_um"]) for disk in disks]
+    for point, grid_position in zip(anchors, nominal):
+        if "nominal_xy_um" in point:
+            saved = _json_point(point["nominal_xy_um"], "nominal fit center")
+            if math.dist(saved, grid_position) > 1e-6:
+                raise ValueError("a nominal fit center disagrees with its grid position")
+    centers = [_json_point(p.get("located_xy_um"), "measured fit center") for p in anchors]
+    fit = fit_similarity_transform if isinstance(transform, SimilarityTransform) else fit_rigid_transform
+    original = fit(*nominal, *centers)
+    if any(math.dist(transform.apply(xy), original.apply(xy)) > 1e-6 for xy in nominal):
+        raise ValueError("the transform disagrees with its two measured fit centers")
+    return disks
+
+
+def _check_third_disk(check, disks, spacing, transform):
+    a, b = disks
+    third = check.get("row"), check.get("col")
+    third_xy = plate_position(*third, spacing)
+    if (b[0] - a[0]) * (third[1] - a[1]) == (b[1] - a[1]) * (third[0] - a[0]):
+        raise ValueError("the three calibration disks must form a triangle")
+    predicted = transform.apply(third_xy)
+    recorded = _json_point(check.get("expected_xy_um"), "third-disk prediction")
+    if math.dist(predicted, recorded) > 1e-6:
+        raise ValueError("the saved third-disk prediction disagrees with the transform")
+    measured = _json_point(check.get("measured_xy_um"), "measured third center")
+    distance = math.dist(predicted, measured)
+    recorded_distance = _json_number(check.get("error_distance_um"), "third-disk error")
+    if not math.isclose(distance, recorded_distance, rel_tol=0, abs_tol=1e-6):
+        raise ValueError("the saved third-disk error disagrees with the measurement")
+    if distance > VALIDATION_TOLERANCE_UM:
+        dx, dy = measured[0] - predicted[0], measured[1] - predicted[1]
+        raise ValueError(f"third-disk error {distance:g} µm exceeds {VALIDATION_TOLERANCE_UM:g} µm "
+                         f"(measured - predicted: X={dx:+.3f}, Y={dy:+.3f} µm)")
+
+
+def _verify_measurements(document, transform):
+    check = document.get("validation")
+    if not isinstance(check, dict) or check.get("passed", True) is not True:
+        raise ValueError("missing or failed calibration check")
+    disks = _check_measured_fit(document, transform)
+    if "method" in check:
+        if check != {"method": TWO_EXPOSED_ANCHORS} or not isinstance(transform, SimilarityTransform):
+            raise ValueError("invalid two-exposure calibration record")
+    else:
+        _check_third_disk(check, disks, document["spacing_um"], transform)
+
+
 def read_validated_calibration(path):
-    """Check the saved transform against its two fit centers and the independent third."""
+    """Verify the center measurements supporting a completed calibration."""
     try:
         document, transform = _read_calibration(path)
-        check = document.get("validation")
-        if not isinstance(check, dict) or check.get("passed", True) is not True:
-            raise ValueError("missing or failed third-disk check")
-
-        spacing = document["spacing_um"]
-        anchors = document["calibration_points"]
-        a, b, third = [(p.get("row"), p.get("col")) for p in (*anchors, check)]
-        first_xy, second_xy, third_xy = [plate_position(*disk, spacing) for disk in (a, b, third)]
-        if (b[0] - a[0]) * (third[1] - a[1]) == (b[1] - a[1]) * (third[0] - a[0]):
-            raise ValueError("the three calibration disks must form a triangle")
-
-        centers = [_json_point(p.get("located_xy_um"), "measured fit center") for p in anchors]
-        fit = fit_similarity_transform if isinstance(transform, SimilarityTransform) else fit_rigid_transform
-        original = fit(first_xy, second_xy, *centers)
-        if any(math.dist(transform.apply(xy), original.apply(xy)) > 1e-6
-               for xy in (first_xy, second_xy)):
-            raise ValueError("the transform disagrees with its two measured fit centers")
-
-        predicted = transform.apply(third_xy)
-        recorded = _json_point(check.get("expected_xy_um"), "third-disk prediction")
-        if math.dist(predicted, recorded) > 1e-6:
-            raise ValueError("the saved third-disk prediction disagrees with the transform")
-        measured = _json_point(check.get("measured_xy_um"), "measured third center")
-        distance = math.dist(predicted, measured)
-        recorded_distance = _json_number(check.get("error_distance_um"), "third-disk error")
-        if not math.isclose(distance, recorded_distance, rel_tol=0, abs_tol=1e-6):
-            raise ValueError("the saved third-disk error disagrees with the measurement")
-        if distance > VALIDATION_TOLERANCE_UM:
-            raise ValueError(f"third-disk error {distance:g} µm exceeds {VALIDATION_TOLERANCE_UM:g} µm")
+        _verify_measurements(document, transform)
     except FileNotFoundError as exc:
-        raise FileNotFoundError(f"No calibration at {path}. Run calibrate.bat for this carrier.") from exc
+        raise FileNotFoundError(f"No calibration at {path}.") from exc
     except ValueError as exc:
-        raise ValueError(f"Invalid calibration at {path}: {exc}. Run calibrate.bat for this carrier.") from exc
+        raise ValueError(f"Invalid calibration at {path}: {exc}.") from exc
     return document, transform
 
 
 def load_validated_plate_calibration(path):
-    """Return spacing and transform only after checking the third disk."""
+    """Return the spacing and transform after verifying the recorded calibration."""
     document, transform = read_validated_calibration(path)
     return float(document["spacing_um"]), transform
 

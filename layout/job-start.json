@@ -1,6 +1,15 @@
 {
   "version": 1,
-  "kind": "point",
-  "x": 672,
-  "y": 349
+  "kind": "click",
+  "box": [
+    655,
+    335,
+    715,
+    360
+  ],
+  "offset": [
+    27,
+    13
+  ],
+  "image": "job-start-4aa68890e9d748e7a6370a0ac30df89e.png"
 }

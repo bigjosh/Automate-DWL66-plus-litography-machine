@@ -1,6 +1,15 @@
 {
   "version": 1,
-  "kind": "point",
-  "x": 1638,
-  "y": 737
+  "kind": "click",
+  "box": [
+    1628,
+    725,
+    1679,
+    743
+  ],
+  "offset": [
+    25,
+    9
+  ],
+  "image": "set-zero-button-6d5c64c80f6e445b979e800a65387691.png"
 }

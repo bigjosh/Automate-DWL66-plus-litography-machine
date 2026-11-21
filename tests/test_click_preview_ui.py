@@ -47,6 +47,34 @@ class ClickPreviewTests(unittest.TestCase):
                 self.h.action = close
                 self.assertIsNone(layouts.show_click_preview("test", Image.new("RGB", (2, 2)), (1, 1)))
                 self.assertTrue(all(widget.destroyed for widget in self.h.widgets))
+                self.assertFalse(self.h.timers)
+
+    def test_overview_and_magnifier_blink_together(self):
+        screenshot = Image.new("RGB", (120, 40), "white")
+        screenshot.putpixel((50, 25), (12, 34, 56))
+        source = screenshot.tobytes()
+
+        def inspect(root):
+            canvases = self.h.image_canvases()
+            self.assertEqual(len(canvases), 2)
+            initial = [[(kind, coords) for kind, coords, _ in canvas.visible_items()]
+                       for canvas in canvases]
+            for items in initial:
+                self.assertIn("line", [kind for kind, _ in items])
+            pixels = [view.tobytes() for view in self.h.images()]
+            self.h.tick()
+            for canvas in canvases:
+                self.assertEqual([kind for kind, _, _ in canvas.visible_items()], ["image"])
+            self.assertEqual([view.tobytes() for view in self.h.images()], pixels)
+            self.h.tick()
+            for canvas, expected in zip(canvases, initial):
+                self.assertEqual([(kind, coords) for kind, coords, _ in canvas.visible_items()], expected)
+            self.h.click("Back to step")
+
+        self.h.action = inspect
+        layouts.show_click_preview("move-absolute", screenshot, (50, 25))
+        self.assertEqual(screenshot.tobytes(), source)
+        self.assertFalse(self.h.timers)
 
     def test_invalid_point_rejected_before_window_opens(self):
         with self.assertRaises(layouts.LayoutError):

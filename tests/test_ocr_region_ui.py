@@ -107,6 +107,7 @@ class OCRRegionUITests(unittest.TestCase):
 
     def test_current_crop_and_literal_ocr_text_are_available_before_next(self):
         raw = " X=-71222.3, Y=0 µm\n"
+        detail = "Difference X=-0.3, Y=+0 um"
 
         def review(root):
             canvas = next(widget for widget in self.h.widgets if widget.kind == "Canvas")
@@ -118,10 +119,12 @@ class OCRRegionUITests(unittest.TestCase):
             text = next(widget for widget in self.h.widgets if widget.kind == "Text")
             self.assertEqual(text.contents, repr(raw))
             self.assertEqual(text.options["state"], "disabled")
+            result = next(w for w in self.h.widgets if w.options.get("text") == detail)
+            self.assertNotEqual(result.options.get("fg"), "#b00020")
             self.h.click("Next Step")
 
         self.h.action = review
-        self.assertEqual(layouts.ocr_dialog("actual-xy", self.crop, raw), 0)
+        self.assertEqual(layouts.ocr_dialog("actual-xy", self.crop, raw, detail=detail), 0)
         self.assertTrue(self.h.roots[0].destroyed)
 
     def test_caller_buttons_return_their_exact_index(self):

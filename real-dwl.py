@@ -1,15 +1,18 @@
-"""Expose pending disks using the carrier's independently verified stage calibration."""
+"""Optically center and expose two pending disks, then write from their calibrated positions."""
 
 import argparse
 from datetime import datetime
 from pathlib import Path
+import subprocess
+import sys
 import time
 
 import playwrightscriptlib as psl
+from batch_calibration import BatchCalibration
 from batch_state import BatchState
 from dwl_actions import (
     CLICK_SETTLE_SECONDS, check_frame, check_stage_position, click, configure_machine_screen,
-    focus, raise_head, restore_stage_frame, send_absolute_move,
+    focus, optical_center_find, raise_head, read_xy, restore_stage_frame, send_absolute_move,
 )
 from plate_transform import load_validated_plate_calibration, plate_position
 from run_folders import add_run_arguments, run_session
@@ -63,12 +66,12 @@ def dismiss_finished_job():
     psl.sendkeys(" ")
 
 
-def run_disk(batch, position, spacing, transform, ocr_cmd):
+def run_disk(batch, position, spacing, transform, ocr_cmd, *, anchor_plan=None):
     row, col = position
     psl.info(f"*** Starting cycle for row {row}, column {col} ***")
     local = plate_position(row, col, spacing)
     psl.info(f"Local target ({row},{col}): X={local[0]}, Y={local[1]} um")
-    stage = transform.apply(local)
+    stage = local if anchor_plan is not None else transform.apply(local)
     command = tuple(round(value) for value in stage)
     psl.info(f"Stage target ({row},{col}): X={stage[0]:.3f}, Y={stage[1]:.3f} um; "
              f"Move absolute command X={command[0]}, Y={command[1]} um")
@@ -77,28 +80,72 @@ def run_disk(batch, position, spacing, transform, ocr_cmd):
     send_absolute_move(psl, command)
     check_stage_position(psl, command, ocr_cmd)
     focus(psl, "Focus at the verified stage position")
+    if anchor_plan is not None:
+        optical_center_find(psl)
+        text, center = read_xy(psl, ocr_cmd, center_near=command, max_center_shift=spacing / 2)
+        anchor_plan.record_center(position, text, center)
+        psl.info(f"Located disk {position} at stage X={center[0]}, Y={center[1]} um")
     set_disk_origin(ocr_cmd)
+    if anchor_plan is not None:
+        focus(psl, "Refocus at the optically located disk center")
     click(psl, "job-tab")
     check_frame(psl, "job-start-image", 0.999)
 
     if wetrun:
         expose_disk(batch, position)
-        dismiss_finished_job()
     else:
         psl.info("Dry run: raising the head without starting an exposure")
         raise_head(psl, "Raise the head after the dry run")
+    if anchor_plan is not None:
+        anchor_plan.finish_anchor(position)
+    if wetrun:
+        dismiss_finished_job()
     psl.wait(1)
+
+
+def confirm_finished(position):
+    return psl.alarm(
+        f"The exposure for calibration disk {position} started. Its completion was not recorded. "
+        "Check the machine's job history and confirm that this disk finished and the machine is ready.",
+        ("I verified exposure completed", "Stop")) == 0
+
+
+def print_calibration_stats(path):
+    subprocess.run([sys.executable, str(Path(__file__).with_name("calibrate-stats.py")),
+                    str(path)], check=True)
 
 
 def run_batch(args, batch):
     psl.info(f"Batch has {len(batch.pending)} disk(s) left to start.")
-    if not batch.pending:
+    if not batch.pending and batch.calibration_checkpoint() is None:
         return
-    psl.info(f"Loading plate calibration from {args.transform_file.resolve()}")
-    spacing, transform = load_validated_plate_calibration(args.transform_file)
+    path = args.transform_file
+    plan = None
+    if path.exists():
+        psl.info(f"Loading plate calibration from {path.resolve()}")
+        spacing, transform = load_validated_plate_calibration(path)
+        BatchCalibration.acknowledge_saved(batch, path, dry_run=not wetrun)
+        positions = batch.pending
+    else:
+        plan = BatchCalibration(batch, path, dry_run=not wetrun)
+        plan.resume(confirm_finished)
+        spacing, transform = plan.spacing, plan.transform
+        positions = plan.positions
+        if transform is not None and wetrun:
+            print_calibration_stats(path)
+        elif positions:
+            psl.info(f"Optical calibration disk(s) {plan.anchors}. "
+                     "Find wafer center optical must have its Set zero option off.")
+    if not positions:
+        return
     ocr_cmd = connect_to_machine(args)
-    for position in batch.pending:
-        run_disk(batch, position, spacing, transform, ocr_cmd)
+    for position in positions:
+        anchor = plan if plan is not None and position in plan.anchors else None
+        run_disk(batch, position, spacing, transform, ocr_cmd, anchor_plan=anchor)
+        if anchor is not None and anchor.transform is not None:
+            transform = anchor.transform
+            if wetrun:
+                print_calibration_stats(path)
 
 
 def main():

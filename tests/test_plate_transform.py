@@ -28,6 +28,12 @@ class PlateTransformTests(unittest.TestCase):
         self.assertEqual(plate_position(0, 5), (-71222.5, -71222.5))
         self.assertEqual(plate_position(2, 3, spacing=20), (-10.0, -10.0))
 
+    def test_farthest_disks_uses_pending_order_to_break_ties(self):
+        self.assertEqual(plate_transform.farthest_disks([]), ())
+        self.assertEqual(plate_transform.farthest_disks([(2, 3)]), ((2, 3),))
+        corners = [(5, 0), (0, 0), (0, 5), (5, 5)]
+        self.assertEqual(plate_transform.farthest_disks(corners), ((5, 0), (0, 5)))
+
     def test_identity(self):
         a, b = plate_position(0, 0), plate_position(5, 5)
         fit = fit_rigid_transform(a, b, a, b)
@@ -243,22 +249,63 @@ class ProductionValidationTests(unittest.TestCase):
         self.assertEqual(plate_transform.load_validated_plate_calibration(self.path),
                          (self.spacing, self.transform))
 
+    def test_two_exposed_anchors_support_a_scaled_fit(self):
+        check = {"method": "two_exposed_anchors"}
+        save_calibration(self.path, self.transform, spacing=self.spacing,
+                         calibration_points=self.anchors, validation=check, overwrite=False)
+        doc, transform = plate_transform.read_validated_calibration(self.path)
+        self.assertEqual(doc["validation"], check)
+        self.assertEqual((doc["spacing_um"], transform), (self.spacing, self.transform))
+
+    def test_changed_two_anchor_record_cannot_be_used(self):
+        save_calibration(self.path, self.transform, spacing=self.spacing,
+                         calibration_points=self.anchors, validation={"method": "two_exposed_anchors"})
+        original = json.loads(self.path.read_text(encoding="utf-8"))
+        for changes in ({"located_xy_um": [0, 0]}, {"row": 5, "col": 5},
+                        {"nominal_xy_um": [0, 0]}, {"row": True}):
+            with self.subTest(changes=changes):
+                doc = copy.deepcopy(original)
+                doc["calibration_points"][0].update(changes)
+                self.path.write_text(json.dumps(doc), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    plate_transform.read_validated_calibration(self.path)
+        for check in ({"method": "pending"}, {"method": "two_exposed_anchors", "passed": False},
+                      {"method": "two_exposed_anchors", "error_distance_um": 600},
+                      {"status": "pending"}, None):
+            with self.subTest(check=check):
+                doc = dict(original, validation=check)
+                self.path.write_text(json.dumps(doc), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    plate_transform.read_validated_calibration(self.path)
+
+    def test_inconsistent_fit_cannot_be_published_as_completed(self):
+        self.anchors[0]["located_xy_um"] = [0, 0]
+        with self.assertRaisesRegex(ValueError, "disagrees with its two measured fit centers"):
+            save_calibration(self.path, self.transform, spacing=self.spacing,
+                             calibration_points=self.anchors, validation={"method": "two_exposed_anchors"})
+        self.assertFalse(self.path.exists())
+
+    def test_excess_radial_error_reports_both_signed_axis_offsets(self):
+        self.record(dx=-400, dy=400)
+        with self.assertRaisesRegex(ValueError, r"measured - predicted: X=-400\.000, Y=\+400\.000 µm"):
+            plate_transform.load_validated_plate_calibration(self.path)
+
     def test_rejects_excess_radial_error_unrelated_evidence_and_failed_check(self):
         for changes in (dict(dx=400, dy=400), dict(dx=0, dy=500.001),
                         dict(expected_xy_um=[0, 0]), dict(error_distance_um=0),
                         dict(passed=False), dict(disk=(0, 0)), dict(disk=(2, 2))):
             with self.subTest(changes=changes):
                 self.record(**changes)
-                with self.assertRaisesRegex(ValueError, "calibrate.bat"):
+                with self.assertRaisesRegex(ValueError, "Invalid calibration"):
                     plate_transform.load_validated_plate_calibration(self.path)
 
-    def test_missing_or_unvalidated_file_directs_operator_to_calibrate(self):
-        with self.assertRaisesRegex(FileNotFoundError, "calibrate.bat"):
+    def test_missing_and_unvalidated_files_are_distinguished(self):
+        with self.assertRaisesRegex(FileNotFoundError, "No calibration"):
             plate_transform.load_validated_plate_calibration(self.path)
         save_calibration(self.path, self.transform, spacing=self.spacing,
                          calibration_points=self.anchors)
         self.assertEqual(load_calibration(self.path), self.transform)
-        with self.assertRaisesRegex(ValueError, "calibrate.bat"):
+        with self.assertRaisesRegex(ValueError, "missing or failed calibration"):
             plate_transform.load_validated_plate_calibration(self.path)
 
     def test_wrong_rotation_about_the_validation_disk_cannot_pass(self):

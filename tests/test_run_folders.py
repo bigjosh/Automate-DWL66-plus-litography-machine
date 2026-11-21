@@ -1,5 +1,6 @@
 """Run selection, initialization and Windows launch checks in a temporary project."""
 
+import argparse
 from datetime import datetime
 import os
 from pathlib import Path
@@ -10,7 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from run_folders import active_run, create_run, latest_run
+from run_folders import active_run, add_run_arguments, create_run, latest_run, run_session
 
 
 PROJECT = Path(__file__).resolve().parents[1]
@@ -39,6 +40,7 @@ class RunFolderTests(unittest.TestCase):
         self.assertEqual((first / "run-list.txt").read_bytes(), self.contents)
         (first / "skip-list.txt").write_bytes(b"(1,3)\n")
         (first / "plate-calibration.json").write_bytes(b"first carrier")
+        (first / "plate-write-calibration.json").write_bytes(b"first write calibration")
         self.template.write_bytes(b"(5,5)\n")
 
         second = create_run(self.project)
@@ -47,11 +49,26 @@ class RunFolderTests(unittest.TestCase):
         self.assertEqual((second / "run-list.txt").read_bytes(), b"(5,5)\n")
         self.assertEqual((second / "skip-list.txt").read_bytes(), b"")
         self.assertFalse((second / "plate-calibration.json").exists())
+        self.assertFalse((second / "plate-write-calibration.json").exists())
         self.assertEqual((first / "run-list.txt").read_bytes(), self.contents)
         self.assertEqual((first / "skip-list.txt").read_bytes(), b"(1,3)\n")
         self.assertEqual((first / "plate-calibration.json").read_bytes(), b"first carrier")
+        self.assertEqual((first / "plate-write-calibration.json").read_bytes(), b"first write calibration")
         self.assertEqual(original_skip.read_bytes(), b"(0,0)")
         self.assertEqual(original_fit.read_bytes(), b"legacy transform")
+
+    def test_write_and_survey_launchers_select_separate_run_files(self):
+        folder = create_run(self.project)
+        (folder / "plate-calibration.json").write_bytes(b"existing survey")
+        for survey, name in ((False, "plate-write-calibration.json"), (True, "plate-calibration.json")):
+            with self.subTest(survey=survey):
+                parser = argparse.ArgumentParser()
+                add_run_arguments(parser, calibration=survey)
+                args = parser.parse_args(["--latest-run"])
+                with run_session(self.project, args, calibration=survey) as selected:
+                    self.assertEqual(selected, folder)
+                    self.assertEqual(args.transform_file, folder / name)
+                    self.assertEqual(args.skip_list, folder / "skip-list.txt")
 
     def test_newest_timestamp_wins_over_mtime_regardless_of_contents(self):
         old = create_run(self.project)
@@ -132,7 +149,8 @@ class RunFolderTests(unittest.TestCase):
         result = subprocess.run(launch, env=env, cwd=self.root, capture_output=True, text=True,
                                 stdin=subprocess.DEVNULL, timeout=15)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("calibrate.bat", result.stdout)
+        self.assertIn("Start run.bat", result.stdout)
+        self.assertNotIn("calibrate.bat", result.stdout)
         self.assertTrue((latest_run(self.project) / "run-list.txt").is_file())
         self.assertFalse((self.root / "runs").exists())
         before = list(self.runs.iterdir())

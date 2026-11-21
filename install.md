@@ -156,18 +156,22 @@ whole run; a full 36-disk cycle can take about 12 hours.
 
 Before starting the production script:
 
-- Load the 36 disks into the tray and the tray into the machine; start with
-  the machine in its LOAD position.
+- Load the disks into the tray and the tray into the machine. Start in the
+  LOAD position with the head raised at Z=0.
 - Set up the global alignment panel to option P1 for the absolute move.
   In the Stage panel, check **Reset Offset** and **Reset Rotation** beside
   **CENTER** so the next disk's move starts in the calibration coordinate frame.
+- Select **Find wafer center optical** for alignment. Set its automatic
+  **Set zero** option to **False** so the script can read each optical
+  center in stage coordinates before it zeros that disk.
 - Use the intended optical autofocus mode and verify the correct exposure job
   is loaded on the Jobs tab.
 - Put the laser writer software on the right-hand monitor, maximized, with
   the panels arranged to match the saved references.
 - Review the [batch files](#batch-tracking-and-recovery) for the tray being run.
   In `real-dwl.py`, `wetrun=True` enables exposure. With `wetrun=False`, the
-  script still moves and focuses, and the disks remain eligible for exposure.
+  script moves and focuses, uses any newly measured calibration in memory,
+  and leaves the disks eligible for exposure.
 
 All four DWL programs automatically load the [layout folder](layout/) beside
 the scripts, even when launched from another working directory. It contains the
@@ -243,7 +247,7 @@ the OCR pause shows the current crop and recognized text. Select **Redefine
 OCR area**, drag the replacement rectangle on a frozen screenshot, and review
 its crop and OCR result before choosing **Save OCR area**. Allow enough width
 for both full coordinates, including minus signs and five-digit values.
-All three checks share `actual-xy`, so one saved change applies to all three.
+The move, center, and zero checks share the same `actual-xy` rectangle.
 
 Production and calibration each try up to five fresh OCR reads. The delay is
 five seconds before each capture. After **Set zero**, the first read uses the
@@ -262,20 +266,37 @@ run. Retrying the OCR does not repeat a move, focus, or exposure.
 
 ## Start the production script
 
-For a newly loaded carrier, stop the previous run, execute `.\new-run.bat`
-from the DWL repository folder, then run `.\calibrate.bat`. After it passes,
-start production with the command below. When resuming the same seated carrier
-with a validated calibration, go directly to this command.
+For a newly loaded carrier, stop the previous run and execute `.\new-run.bat`
+from the DWL repository folder. Check the new folder's run and skip lists.
+To start writing, or to resume the same seated carrier, run the following.
 
 ```powershell
 .\run.bat
 ```
 
-At startup the script opens the newest carrier run and reads its
-`plate-calibration.json`. Before connecting to write a pending disk, it
-requires a passing independent third-disk check. Each move logs the
-local and stage targets in µm and rounds the stage coordinates to whole µm
-for Move absolute and its OCR check.
+On a fresh run the two disks farthest apart among the pending entries are
+written first. With the default list and an empty skip list these are
+`(0,0)` and `(5,5)`. Both must be present in the carrier.
+
+1. For each of the pair, the script restores the stage coordinate frame,
+   moves to the nominal position, verifies X/Y, focuses, and runs **Find
+   wafer center optical**. It reads the center in stage coordinates, clicks
+   **Set zero**, verifies zero, refocuses, and exposes that disk.
+2. When both exposures have completed, the script saves the two centers and
+   the fitted translation, rotation, and uniform scale in
+   `plate-write-calibration.json` and prints the pitch, offset, and rotation.
+   This production workflow uses two center finds and has no third-disk error
+   measurement.
+3. For each remaining pending disk in run-list order, the script computes the
+   stage target from the saved transform, verifies the move, and focuses once.
+   It clicks **Set zero** at that disk center and verifies zero before opening
+   the Job tab and writing.
+
+The script logs the local and calibrated stage targets in µm and rounds the
+stage coordinates to whole µm for Move absolute and its OCR check.
+If only one disk is pending and the run has no production calibration or
+calibration progress, the script optically centers and writes that disk.
+One center is insufficient to fit a transform.
 
 If Tesseract is installed in a different location, specify its path with
 `--tesseract-cmd`.
@@ -288,11 +309,9 @@ The script starts in single-step mode. Advance with the operator controls or
 select continuous operation when ready. Skipping or aborting a required frame
 check stops the run. Each invocation appends to `real-dwl.log` in the selected
 run folder and saves its screen captures under `screenshots\`.
-The script checks the X/Y integer readouts within ±500 µm
-on each axis after CENTER and after the move. For a calibrated disk it focuses
-once, waits for the executing and ready indicators, clicks **Set zero**, and
-checks that Actual X/Y are within the same tolerance of (0,0) before opening
-the Job tab. At the next disk it checks the CENTER reset options again.
+The script checks the X/Y integer readouts within ±500 µm on each axis after
+**CENTER**, after the move, and after **Set zero**. At the next disk it
+checks the CENTER reset options again.
 If your layout asks for `center-reset-options`, select the two checked boxes.
 For `set-zero-button`, capture the Stage panel’s **Set zero** button and mark
 a point inside it.
@@ -307,9 +326,10 @@ run list, exposure record, and calibration for that carrier placement.
 
 | File in the run folder | How it is used |
 | --- | --- |
-| `run-list.txt` | Snapshot of the [repository template](run-list.txt). Each `(row,col)` occupies one line, in exposure order. Edit the snapshot while the run is stopped to change this carrier's order or subset. Edit the template for future runs. |
-| `skip-list.txt` | Starts empty. Production records each disk here when it sends the final exposure confirmation. |
-| `plate-calibration.json` | Created by a successful `.\calibrate.bat` for this placement. |
+| `run-list.txt` | Snapshot of the [repository template](run-list.txt). Each `(row,col)` occupies one line. Production follows this order after writing the two calibration disks. Edit the snapshot while the run is stopped to change this carrier's order or subset. Edit the template for future runs. |
+| `skip-list.txt` | Starts empty. Production records each disk when it sends the final exposure confirmation. It also saves the calibration pair and its progress as comments for restarts. |
+| `plate-write-calibration.json` | The transform used by `run.bat` for this placement. Production saves it after both calibration exposures finish. |
+| `plate-calibration.json` | Result of the [optional three-disk survey](#optional-three-disk-calibration). A run containing only the survey and no calibration progress starts its production calibration on the pending disks. |
 
 **To resume the same seated carrier**, run `.\run.bat` again. It selects the
 latest `YYMMDD HHMMSS` folder directly under `runs\` by the timestamp in its
@@ -320,22 +340,22 @@ A timestamped folder from the older logging workflow also qualifies. If the
 latest folder contains only screenshots or logs, startup stops at that folder.
 The program never searches older folders for a usable calibration or skip list.
 Use `.\new-run.bat` for a newly loaded carrier. For a partially written carrier,
-recover its exposure record or follow the instructions below. For a current
-run awaiting calibration, use `.\calibrate.bat`.
+recover its exposure record or follow the instructions below.
 
-**When upgrading mid-carrier**, keep using the existing run list, skip list
-and verified calibration together. To resume a carrier whose three files
-already live beside `real-dwl.py`, run this command from the repository
-folder. It uses the existing exposure record. Creating a fresh run for this
-carrier would start with an empty skip list and could expose disks twice.
+**When upgrading mid-carrier**, keep the carrier seated and use its existing run
+and skip lists. If they already live in the latest timestamped run, launch
+`.\run.bat` as usual from the repository. A previous three-disk survey
+can stay in place.
+
+For an older carrier whose lists live beside `real-dwl.py`, run this command
+from the repository folder to use its existing exposure record. Creating a new
+run for this carrier would start with an empty skip list and could expose disks
+twice.
 
 ```powershell
-.\.venv\Scripts\python.exe real-dwl.py --run-list ".\run-list.txt" --skip-list ".\skip-list.txt" --transform-file ".\plate-calibration.json"
+.\.venv\Scripts\python.exe real-dwl.py --run-list ".\run-list.txt" --skip-list ".\skip-list.txt" --transform-file ".\plate-write-calibration.json"
 ```
 
-If that seated carrier has an older two-disk calibration, first run
-`calibrate-plate.py` directly with the same three file arguments. A successful
-third-disk check makes the replacement calibration eligible for production.
 For a carrier started with the old hardcoded skip list, enter all previously
 started disks and intentional skips in its skip list before resuming.
 
@@ -352,7 +372,18 @@ Check the machine's job history for that disk. If exposure started, replace
 the entire line with `(2,3)`. If it definitely did not start, remove the line.
 Keep the rest of the file and resume.
 
-## Calibrate the carrier
+Keep the `# auto-calibration` comments in the skip list. They preserve the
+selected disks, measured centers, and recorded completions across restarts.
+If a calibration disk started writing but its completion was never recorded,
+the script asks you to check the machine's job history. Choose **I verified
+exposure completed** only after confirming the disk finished and the machine
+is ready. Choose **Stop** if completion is uncertain.
+
+## Optional three-disk calibration
+
+Use `.\calibrate.bat` for a separate survey when you want an independent
+third-disk error measurement. It writes `plate-calibration.json`. The
+production launcher uses its own `plate-write-calibration.json`.
 
 Start with the head raised at Z=0. Select **Find wafer center optical**, turn
 off its automatic **Set zero**, and check **Reset Offset** and **Reset Rotation**
@@ -387,10 +418,10 @@ check must pass. **Skip and continue** or **Abort verify** stops calibration.
 On success, `plate-calibration.json` contains the two fit measurements, the
 transform, and the independent measurement and error. The launcher then prints
 the nominal and measured pitch, stage X/Y offsets, rotation in degrees, scale
-and third-disk result. To print the saved statistics again without connecting
-to the machine, run `python calibrate-stats.py`. It reads the newest run's
-calibration by default. Supply the path to a saved calibration file to inspect
-an older run.
+and third-disk result. To print survey statistics again, pass the path to that
+run's `plate-calibration.json` to `python calibrate-stats.py`. Running
+`python calibrate-stats.py` with no arguments displays the latest run's
+production calibration.
 
 If the exposure run list contains fewer than three disks or lies on one line,
 supply a separate list of mounted disks with `.\calibrate.bat --run-list "path\to\calibration-list.txt"`.

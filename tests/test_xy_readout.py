@@ -170,10 +170,12 @@ class RequiredPositionTests(unittest.TestCase):
                 self.assertEqual(actual, xy_readout.parse_xy_integers(text))
 
     def test_either_axis_outside_tolerance_fails_with_actual_and_expected(self):
-        for text in (
-            "X=511, Y=-20 µm", "X=-491.9999, Y=-20 µm",
-            "X=10, Y=-521 µm", "X=10, Y=481.9999 µm",
-            "X=511, Y=-521 µm",
+        for text, difference in (
+            ("X=511, Y=-20 µm", "X=+501, Y=+0"),
+            ("X=-491.9999, Y=-20 µm", "X=-501, Y=+0"),
+            ("X=10, Y=-521 µm", "X=+0, Y=-501"),
+            ("X=10, Y=481.9999 µm", "X=+0, Y=+501"),
+            ("X=511, Y=-521 µm", "X=+501, Y=-501"),
         ):
             with self.subTest(text=text):
                 with self.assertRaises(xy_readout.ReadoutError) as raised:
@@ -182,6 +184,7 @@ class RequiredPositionTests(unittest.TestCase):
                 self.assertIn("FAILED", message)
                 self.assertIn("expected X=10, Y=-20", message)
                 self.assertIn("integer readout X=", message)
+                self.assertIn(difference + " um", message)
                 self.assertIn("+/-500 um", message)
                 self.assertIn(repr(text), message)
 

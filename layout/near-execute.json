@@ -1,6 +1,15 @@
 {
   "version": 1,
-  "kind": "point",
-  "x": 1426,
-  "y": 427
+  "kind": "click",
+  "box": [
+    1407,
+    413,
+    1444,
+    444
+  ],
+  "offset": [
+    19,
+    13
+  ],
+  "image": "near-execute-9acb2d34b879418f8f1564f77505f6f1.png"
 }

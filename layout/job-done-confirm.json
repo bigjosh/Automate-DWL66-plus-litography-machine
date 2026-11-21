@@ -1,6 +1,15 @@
 {
   "version": 1,
-  "kind": "point",
-  "x": 1347,
-  "y": 813
+  "kind": "click",
+  "box": [
+    1346,
+    828,
+    1385,
+    841
+  ],
+  "offset": [
+    19,
+    6
+  ],
+  "image": "job-done-confirm-f20c5224c3344766815e8d60d65d50c4.png"
 }

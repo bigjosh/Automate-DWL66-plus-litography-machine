@@ -13,7 +13,7 @@ import sys
 import tempfile
 from types import ModuleType, SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import xy_readout
 import plate_transform
@@ -29,7 +29,7 @@ class FakePSL(ModuleType):
     """Only explicitly defined methods are available; none has live effects."""
 
     def __init__(self, read_results=None, *, center_read_results=None,
-                 zero_read_results=None, skip_check=None, margin_changes=None,
+                 zero_read_results=None, optical_results=None, skip_check=None, margin_changes=None,
                  click_mismatch=None):
         super().__init__("playwrightscriptlib")
         self.events = []
@@ -38,6 +38,7 @@ class FakePSL(ModuleType):
         self.center_reads = []
         self.move_reads = []
         self.zero_reads = []
+        self.optical_reads = []
         self.pending = {}
         self.pending_read = None
         self.click_point = None
@@ -46,6 +47,7 @@ class FakePSL(ModuleType):
         self.read_results = read_results or {}
         self.center_read_results = center_read_results or {}
         self.zero_read_results = zero_read_results or {}
+        self.optical_results = optical_results or {}
         self.margin_changes = margin_changes or {}
         self.skip_check = skip_check
         self.click_mismatch = click_mismatch
@@ -125,7 +127,7 @@ class FakePSL(ModuleType):
         elif name == "set-zero-button":
             self.pending_read = ("zero", 0, 0)
         elif name == "click-alignment-confirm":
-            raise AssertionError("Production must never run an optical center find")
+            self.pending_read = ("optical", *self.moves[-1])
         elif name == "move-absolute":
             if set(self.pending) != {"x", "y"}:
                 raise AssertionError("Both coordinates must be typed before each move")
@@ -144,13 +146,15 @@ class FakePSL(ModuleType):
         if self.pending_read is None:
             raise AssertionError("OCR read requires a fresh move, center find, CENTER or Set zero")
         phase, x, y = self.pending_read
-        if (retrycount, delay, margin) != (5, 5, 500):
+        expected_margin = 28489 / 2 if phase == "optical" else 500
+        if (retrycount, delay, margin) != (5, 5, expected_margin):
             raise AssertionError(f"Unexpected OCR options for {phase}: {(retrycount, delay, margin)}")
         self.pending_read = None
         phase_reads, results = {
             "center": (self.center_reads, self.center_read_results),
             "move": (self.move_reads, self.read_results),
             "zero": (self.zero_reads, self.zero_read_results),
+            "optical": (self.optical_reads, self.optical_results),
         }[phase]
         index = len(phase_reads)
         self.reads.append((name, tesseract_cmd))
@@ -213,8 +217,18 @@ class RealDWLXYGateTests(unittest.TestCase):
             argv.extend(["--run-list", str(self.run_list), "--skip-list", str(self.skip_list),
                          "--transform-file", str(self.calibration)])
         argv.extend(extra_args)
+
+        def report_stats(command, *, check):
+            executable, utility, calibration = command
+            self.assertTrue(check)
+            self.assertEqual(executable, sys.executable)
+            self.assertEqual(Path(utility), script.with_name("calibrate-stats.py"))
+            self.assertTrue(Path(calibration).is_file())
+            fake.events.append(("stats", Path(calibration)))
+
         with patch.dict(sys.modules, {"playwrightscriptlib": fake}), \
                 patch("time.sleep", new=fake.wait), \
+                patch("subprocess.run", side_effect=report_stats), \
                 patch.object(xy_readout, "TesseractReader", side_effect=preflight), \
                 patch.object(sys, "argv", argv):
             return runpy.run_path(str(script), run_name="__main__")
@@ -327,6 +341,16 @@ class RealDWLXYGateTests(unittest.TestCase):
         self.assertNotIn(("click", "laser-confirm"), fake.events)
         self.assertEqual(self.skip_list.read_text(encoding="utf-8"), "")
 
+    def test_uncalibrated_dry_run_leaves_skip_list_empty_and_transform_unsaved(self):
+        self.calibration.unlink()
+        fake = FakePSL()
+        self.run_script(fake, script=self.dry_run_copy())
+        self.assertEqual(len(fake.moves), len(self.positions))
+        self.assertEqual(len(fake.optical_reads), 2)
+        self.assertNotIn(("click", "laser-confirm"), fake.events)
+        self.assertEqual(self.skip_list.read_bytes(), b"")
+        self.assertFalse(self.calibration.exists())
+
     def test_layout_is_loaded_from_beside_script_when_launched_elsewhere(self):
         fake = FakePSL()
         with chdir(self.run_list.parent):
@@ -338,22 +362,33 @@ class RealDWLXYGateTests(unittest.TestCase):
         project = self.script.parent
         old = create_run(project)
         active = create_run(project)
-        calibration = active / "plate-calibration.json"
+        calibration = active / "plate-write-calibration.json"
         calibration.write_bytes(self.calibration.read_bytes())
         (active / "skip-list.txt").write_text("(5,0)\n", encoding="utf-8")
         fake = FakePSL()
-        with patch.object(plate_transform, 'load_validated_plate_calibration',
-                          wraps=plate_transform.load_validated_plate_calibration) as load, chdir(old):
+        with chdir(old):
             self.run_script(fake, managed=True)
-            self.assertEqual(len(fake.moves), 2)
+            self.assertEqual(fake.moves, self.reference.moves[1:])
+            self.assertFalse(fake.optical_reads)
             self.assertEqual(fake.output, active)
             self.assertEqual(fake.screenshots, active / "screenshots")
             resumed = FakePSL()
             self.run_script(resumed, managed=True, extra_args=["--latest-run"])
             self.assertFalse(resumed.moves)
-        load.assert_called_once_with(calibration)
         self.assertEqual((old / "skip-list.txt").read_bytes(), b"")
         self.assertEqual((active / "skip-list.txt").read_text().splitlines(), ["(5,0)", "(0,1)", "(2,4)"])
+
+    def test_legacy_standalone_calibration_does_not_skip_anchor_writes_on_latest_run(self):
+        active = create_run(self.script.parent)
+        standalone = active / "plate-calibration.json"
+        standalone.write_bytes(self.calibration.read_bytes())
+        fake = FakePSL()
+        self.run_script(fake, managed=True)
+        self.assertEqual(len(fake.optical_reads), 2)
+        self.assertIn(("stats", active / "plate-write-calibration.json"), fake.events)
+        self.assertEqual(fake.events.count(("click", "laser-confirm")), len(self.positions))
+        self.assertEqual(standalone.read_bytes(), self.calibration.read_bytes())
+        self.assertTrue((active / "plate-write-calibration.json").exists())
 
     def test_launcher_cannot_use_other_carriers_calibration_or_progress(self):
         old = create_run(self.script.parent)
@@ -420,19 +455,153 @@ class RealDWLXYGateTests(unittest.TestCase):
                              for e in fake.events))
         self.assertEqual(self.calibration.read_text(encoding='utf-8'), contents)
 
-    def test_pending_work_requires_a_saved_third_disk_check_before_machine_setup(self):
+    def test_new_run_writes_farthest_pending_anchors_before_using_their_transform(self):
         self.calibration.unlink()
-        for error in (FileNotFoundError, ValueError):
-            with self.subTest(error=error):
-                if error is ValueError:
-                    plate_transform.save_calibration(
-                        self.calibration, plate_transform.RigidTransform(1, 0, 0, 0), spacing=28489,
-                        calibration_points=[dict(row=0, col=0), dict(row=5, col=5)])
-                fake = FakePSL()
-                with self.assertRaisesRegex(error, r"calibrate\.bat"):
-                    self.run_script(fake)
-                self.assertTrue(all(event[0] == "info" for event in fake.events))
-                self.assertEqual(self.skip_list.read_bytes(), b"")
+        self.run_list.write_text("(0,0)\n(2,4)\n(5,5)\n(0,1)\n(5,0)\n")
+        self.skip_list.write_text("(0,0)\n")
+        anchors = [(5, 5), (0, 1)]
+        remaining = [(2, 4), (5, 0)]
+        spacing = 28489
+        def stage_center(position):
+            x, y = plate_transform.plate_position(*position, spacing)
+            return 1.002 * x - 0.004 * y + 100.25, 0.004 * x + 1.002 * y - 80.75
+
+        def read_center(index, x, y):
+            found_x, found_y = stage_center(anchors[index])
+            return f"X={found_x:.6f}, Y={found_y:.6f} µm"
+
+        fake = FakePSL(optical_results=read_center)
+        verify = fake.verifyFrame
+
+        def check_calibration_timing(name, **options):
+            if name == "job-finished":
+                completed_before = fake.events.count(("verify", "job-finished"))
+                self.assertEqual(self.calibration.exists(), completed_before >= 2)
+            return verify(name, **options)
+
+        with patch.object(fake, "verifyFrame", side_effect=check_calibration_timing):
+            self.run_script(fake, resume=True)
+
+        self.assertEqual(self.recorded_positions(), [(0, 0), *anchors, *remaining])
+        expected_targets = [plate_transform.plate_position(*p, spacing) for p in anchors]
+        expected_targets.extend(stage_center(p) for p in remaining)
+        self.assertEqual(fake.moves, [tuple(map(round, target)) for target in expected_targets])
+        saved_spacing, fitted = plate_transform.load_plate_calibration(self.calibration)
+        self.assertEqual(saved_spacing, spacing)
+        for pos in anchors + remaining:
+            calculated = fitted.apply(plate_transform.plate_position(*pos, spacing))
+            for actual, expected in zip(calculated, stage_center(pos)):
+                self.assertAlmostEqual(actual, expected)
+        starts = [i for i, e in enumerate(fake.events) if e == ("click", "center-button")]
+        for index, (start, end) in enumerate(zip(starts, starts[1:] + [len(fake.events)])):
+            cycle = fake.events[start:end]
+            expected = [
+                ("read", "center", index), ("click", "move-absolute"), ("read", "move", index),
+                ("click", "focus-button"), ("verify", "focus-ready"),
+            ]
+            if index < 2:
+                expected.extend([("click", "click-alignment-confirm"), ("read", "optical", index)])
+            expected.extend([("click", "set-zero-button"), ("read", "zero", index)])
+            if index < 2:
+                expected.extend([("click", "focus-button"), ("verify", "focus-ready")])
+            expected.extend([("click", "job-start"), ("click", "laser-confirm"),
+                             ("verify", "job-finished")])
+            self.assertEqual([event for event in cycle if event in expected], expected)
+        self.assertEqual(len(fake.optical_reads), 2)
+        self.assertIn(("stats", self.calibration), fake.events)
+
+    def test_anchor_with_unreadable_center_cannot_set_zero_or_start_exposure(self):
+        self.calibration.unlink()
+        fake = FakePSL(optical_results={0: "X=garbled,Y=0 µm"})
+        with self.assertRaises(xy_readout.ReadoutError):
+            self.run_script(fake)
+        self.assertFalse(self.calibration.exists())
+        self.assertFalse(self.recorded_positions())
+        self.assertNotIn(("click", "set-zero-button"), fake.events)
+        self.assertNotIn(("click", "laser-confirm"), fake.events)
+
+    def test_anchor_refocus_must_be_ready_after_zero_before_writing(self):
+        self.calibration.unlink()
+        fake = FakePSL()
+        verify = fake.verifyFrame
+
+        def reject_refocus(name, **options):
+            if name == "focus-ready" and ("read", "zero", 0) in fake.events:
+                return False
+            return verify(name, **options)
+
+        with patch.object(fake, "verifyFrame", side_effect=reject_refocus):
+            with self.assertRaisesRegex(RuntimeError, "focus-ready"):
+                self.run_script(fake)
+        self.assertFalse(self.calibration.exists())
+        self.assertFalse(self.recorded_positions())
+        self.assertIn(("read", "zero", 0), fake.events)
+        self.assertNotIn(("click", "laser-confirm"), fake.events)
+
+    def test_finished_anchor_survives_restart_without_a_duplicate_write(self):
+        self.calibration.unlink()
+        fake = FakePSL()
+        verify = fake.verifyFrame
+
+        def interrupt_second_confirm(name, **options):
+            if name == "laser-confirm-image" and ("verify", "job-finished") in fake.events:
+                raise RuntimeError("Interrupted before second anchor write")
+            return verify(name, **options)
+
+        with patch.object(fake, "verifyFrame", side_effect=interrupt_second_confirm):
+            with self.assertRaisesRegex(RuntimeError, "second anchor write"):
+                self.run_script(fake)
+        self.assertFalse(self.calibration.exists())
+        self.assertEqual(self.recorded_positions(), [self.positions[0]])
+        resumed = FakePSL()
+        self.run_script(resumed, resume=True)
+        self.assertEqual(len(resumed.optical_reads), 1)
+        self.assertEqual(resumed.events.count(("click", "laser-confirm")), 2)
+        self.assertEqual(self.recorded_positions(), self.positions)
+        self.assertTrue(self.calibration.is_file())
+
+    def test_started_anchor_needs_verified_completion_to_publish_after_restart(self):
+        self.calibration.unlink()
+        self.run_list.write_text("(5,0)\n(0,1)\n")
+        fake = FakePSL()
+        verify = fake.verifyFrame
+
+        def lose_second_finish(name, **options):
+            if name == "job-finished" and len(fake.moves) == 2:
+                return False
+            return verify(name, **options)
+
+        with patch.object(fake, "verifyFrame", side_effect=lose_second_finish):
+            with self.assertRaisesRegex(RuntimeError, "job-finished"):
+                self.run_script(fake)
+        self.assertEqual(self.recorded_positions(), self.positions[:2])
+        self.assertFalse(self.calibration.exists())
+
+        decline = FakePSL()
+        decline.alarm = Mock(return_value=1)
+        with self.assertRaises((RuntimeError, SystemExit)):
+            self.run_script(decline, resume=True)
+        decline.alarm.assert_called_once()
+        self.assertFalse(decline.moves)
+        self.assertFalse(self.calibration.exists())
+
+        confirmed = FakePSL()
+        confirmed.alarm = Mock(return_value=0)
+        self.run_script(confirmed, resume=True)
+        confirmed.alarm.assert_called_once()
+        self.assertFalse(confirmed.moves)
+        self.assertNotIn(("click", "laser-confirm"), confirmed.events)
+        self.assertTrue(self.calibration.is_file())
+
+    def test_single_pending_disk_is_centered_and_written_without_saving_a_transform(self):
+        self.calibration.unlink()
+        self.skip_list.write_text("(5,0)\n(0,1)\n")
+        fake = FakePSL()
+        self.run_script(fake, resume=True)
+        self.assertEqual(len(fake.optical_reads), 1)
+        self.assertEqual(fake.events.count(("click", "laser-confirm")), 1)
+        self.assertEqual(self.recorded_positions(), self.positions)
+        self.assertFalse(self.calibration.exists())
 
     def test_completed_batch_needs_no_calibration_or_machine_connection(self):
         self.calibration.unlink()
@@ -520,7 +689,7 @@ class RealDWLXYGateTests(unittest.TestCase):
             cycle = events[start:end]
             sequence = [
                 ("read", "center", index), ("click", "move-absolute"), ("read", "move", index),
-                ("click", "focus-button"), ("verify", "focus-executing"), ("verify", "focus-ready"),
+                ("click", "focus-button"), ("verify", "focus-ready"),
                 ("click", "set-zero-button"),
                 ("read", "zero", index), ("click", "job-tab"),
             ]
@@ -543,15 +712,13 @@ class RealDWLXYGateTests(unittest.TestCase):
 
     def test_skipped_focus_check_stops_before_setting_origin(self):
         self.require_cycles()
-        for name in ("focus-executing", "focus-ready"):
-            with self.subTest(skipped=name):
-                fake = FakePSL(skip_check=name)
-                with self.assertRaises(RuntimeError):
-                    self.run_script(fake)
-                self.assertIn(("verify", name), fake.events)
-                clicks = [e[1] for e in fake.events if e[0] == "click"]
-                self.assertEqual(clicks.count("focus-button"), 1)
-                self.assertTrue({"set-zero-button", "job-tab", "job-start", "laser-confirm"}.isdisjoint(clicks))
+        fake = FakePSL(skip_check="focus-ready")
+        with self.assertRaises(RuntimeError):
+            self.run_script(fake)
+        self.assertIn(("verify", "focus-ready"), fake.events)
+        clicks = [e[1] for e in fake.events if e[0] == "click"]
+        self.assertEqual(clicks.count("focus-button"), 1)
+        self.assertTrue({"set-zero-button", "job-tab", "job-start", "laser-confirm"}.isdisjoint(clicks))
 
     def test_failed_zero_read_stops_before_exposure_and_next_move(self):
         self.require_cycles()
@@ -573,8 +740,11 @@ class RealDWLXYGateTests(unittest.TestCase):
             return f"X={x + 501}, Y={y} µm"
 
         fake = FakePSL(read_results=offset, margin_changes={("move", 0): 501})
-        with self.assertRaises(xy_readout.ReadoutError):
+        with self.assertRaises(xy_readout.ReadoutError) as failure:
             self.run_script(fake)
+        self.assertIn("X=+501, Y=+0 um", str(failure.exception))
+        self.assertTrue(any(event[0] == "info" and "X/Y PASS" in event[1]
+                            and "X=+501, Y=+0 um" in event[1] for event in fake.events))
         self.assertEqual(fake.moves, self.reference.moves[:2])
         self.assertEqual(fake.events.count(("click", "focus-button")), 1)
         self.assertEqual(fake.events[-1], ("read", "move", 1))
@@ -595,6 +765,13 @@ class RealDWLXYGateTests(unittest.TestCase):
                 self.assertFalse(any(event[0] == "click" and event[1] in PROTECTED_ACTIONS
                                      for event in fake.events))
                 self.assertNotIn(("info", "Script finished"), fake.events)
+
+    def test_disk_origin_message_reports_positive_zero_for_negative_zero_read(self):
+        fake = FakePSL(zero_read_results={0: "X=-0.2, Y=-0 um"})
+        self.run_script(fake)
+        origin = next(event[1] for event in fake.events if event[0] == "info" and
+                      event[1].startswith("Disk origin verified after Set zero"))
+        self.assertIn("X=+0, Y=+0 um", origin)
 
     def test_invalid_first_move_read_prevents_focus_alignment_and_exposure(self):
         self.require_cycles()

@@ -1,6 +1,15 @@
 {
   "version": 1,
-  "kind": "point",
-  "x": 1731,
-  "y": 735
+  "kind": "click",
+  "box": [
+    1701,
+    720,
+    1761,
+    749
+  ],
+  "offset": [
+    31,
+    13
+  ],
+  "image": "center-button-4017d45d7de743e79a9fd30d55ea8428.png"
 }
