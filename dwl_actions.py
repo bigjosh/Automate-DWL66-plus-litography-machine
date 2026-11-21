@@ -2,10 +2,12 @@
 
 from decimal import Decimal
 import math
+from pathlib import Path
 
 from xy_readout import ReadoutError, parse_xy
 
 
+LAYOUT_DIR = Path(__file__).resolve().parent / "layout"
 MOVE_TOLERANCE_UM = 50
 
 

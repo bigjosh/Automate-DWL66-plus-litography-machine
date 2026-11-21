@@ -13,7 +13,9 @@ from pathlib import Path
 import shutil
 import tempfile
 
-from dwl_actions import check_frame, click, focus, optical_center_find, read_xy, send_absolute_move
+from dwl_actions import (
+    LAYOUT_DIR, check_frame, click, focus, optical_center_find, read_xy, send_absolute_move,
+)
 from plate_transform import (fit_similarity_transform, load_calibration, plate_position,
                              save_calibration)
 from xy_readout import TesseractReader
@@ -202,7 +204,6 @@ def positive_spacing(value):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("url", nargs="?", default="http://127.0.0.1:9222")
-    parser.add_argument("--layout", type=Path, help="Existing layout; omit for folder picker")
     parser.add_argument("--tesseract-cmd", help="Path to tesseract.exe")
     parser.add_argument("--crd-popup-screenshot", type=Path,
                         help="Redefine the CRD popup guard using this screenshot")
@@ -232,7 +233,7 @@ def main(argv=None):
     try:
         psl.connect(args.url, page_hint="remotedesktop.google.com")
         connected = True
-        psl.loadLayout(args.layout)
+        psl.loadLayout(LAYOUT_DIR)
         psl.checkViewport()
         psl.enableClickGuard("crd-popup", timeout=30,
                              referenceScreenshot=args.crd_popup_screenshot)

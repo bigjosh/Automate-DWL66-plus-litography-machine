@@ -40,9 +40,9 @@ Do these before starting the script
 * Check Reset Offset and Reset Rotation beside CENTER for calibrated moves.
 * Make sure the right job is loaded on the Jobs tab (currently `zzzzzzzpfstandardraster1103`)
 
-If you use an older saved layout, match its reference screenshot. The earlier
-layout had Configuration, Write Mode, and Automation stacked three levels tall
-and the tabs in the order Execute a Global Alignment, Alignments, Job.
+The DWL programs automatically use the [layout folder](layout/) beside the
+scripts for click positions, capture rectangles, and reference images. If a
+panel has moved, line it up with the reference or redefine the affected entries.
 
 # Start Script
 

@@ -8,6 +8,8 @@ from tkinter import messagebox, ttk
 
 from PIL import Image, ImageTk
 
+from dwl_actions import LAYOUT_DIR
+
 
 # Keep these formulas and named controls consistent with real-dwl.py.
 SPACING = 28489
@@ -232,10 +234,9 @@ def main():
     parser = argparse.ArgumentParser(description=(
         "Capture Actual X/Y reference pixels with operator review. Start at Actual "
         "X=0, Y=0 with the head raised (Z=0), the Global alignment panel open, and "
-        "the browser displaying the chosen screen layout."
+        "the browser displaying the saved DWL screen layout."
     ))
     parser.add_argument("url", nargs="?", default="http://127.0.0.1:9222", help="Chrome remote-debugging URL")
-    parser.add_argument("--layout", type=Path, help="Layout folder; omit to choose a folder interactively")
     parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parent,
                         help="Capture directory (default: next to this script); existing X/Y captures are never overwritten")
     args = parser.parse_args()
@@ -249,7 +250,7 @@ def main():
         psl.logging(True)
         psl.connect(args.url, page_hint="remotedesktop.google.com")
         connected = True
-        psl.loadLayout(args.layout)
+        psl.loadLayout(LAYOUT_DIR)
         psl.clicksSettleTime(1)
         psl.pauseOnInfo(False)
         run_capture(psl, ui, args.output_dir.resolve(), sleep=ui.wait_seconds)

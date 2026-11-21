@@ -5,6 +5,7 @@ and pixel reads are also faked, so executing the script cannot operate hardware.
 """
 
 from ast import literal_eval
+from contextlib import chdir
 from pathlib import Path
 import re
 import runpy
@@ -184,8 +185,7 @@ class SimulatedBatchTest(unittest.TestCase):
 
         if not resume:
             self.skip_list.unlink(missing_ok=True)
-        argv = [str(script), "--layout", "offline-layout",
-                "--tesseract-cmd", OCR_EXECUTABLE, "--run-list", str(self.run_list),
+        argv = [str(script), "--tesseract-cmd", OCR_EXECUTABLE, "--run-list", str(self.run_list),
                 "--skip-list", str(self.skip_list)]
         if not use_default_calibration:
             argv.extend(['--transform-file', str(self.calibration)])
@@ -278,13 +278,20 @@ class RealDWLXYGateTests(SimulatedBatchTest):
         self.assertNotIn(("click", "laser-confirm"), fake.events)
         self.assertEqual(self.skip_list.read_text(encoding="utf-8"), "")
 
+    def test_layout_is_loaded_from_beside_script_when_launched_elsewhere(self):
+        fake = FakePSL()
+        with chdir(self.run_list.parent):
+            self.run_script(fake)
+        layouts = [event[1] for event in fake.events if event[0] == "layout"]
+        self.assertEqual(layouts, [SCRIPT.with_name("layout")])
+
     def test_default_calibration_is_loaded_once_from_beside_script(self):
-        # Redirect the read to our fixture, while checking the actual default path.
-        fixture = plate_transform.load_plate_calibration(self.calibration)
-        with patch.object(plate_transform, 'load_plate_calibration', return_value=fixture) as load:
-            self.run_script(FakePSL(), use_default_calibration=True)
-        self.assertEqual(load.call_count, 1)
-        self.assertEqual(Path(load.call_args.args[0]), SCRIPT.with_name('plate-calibration.json'))
+        script = self.calibration.with_name(SCRIPT.name)
+        script.write_bytes(SCRIPT.read_bytes())
+        with patch.object(plate_transform, 'load_plate_calibration',
+                          wraps=plate_transform.load_plate_calibration) as load:
+            self.run_script(FakePSL(), script=script, use_default_calibration=True)
+        load.assert_called_once_with(self.calibration)
 
     def test_calibrated_moves_log_local_and_stage_targets_and_verify_stage_readback(self):
         # A 90-degree rotation, non-unit scale, fractional offset and odd pitch

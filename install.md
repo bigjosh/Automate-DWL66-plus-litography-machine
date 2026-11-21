@@ -164,17 +164,19 @@ Before starting the production script:
 - Use the intended optical autofocus mode and verify the correct exposure job
   is loaded on the Jobs tab.
 - Put the laser writer software on the right-hand monitor, maximized, with
-  the panels arranged to match the selected layout.
+  the panels arranged to match the saved references.
 - Review the [batch files](#batch-tracking-and-recovery) for the tray being run.
   In `real-dwl.py`, `wetrun=True` enables exposure. With `wetrun=False`, the
   script still moves and focuses, and the disks remain eligible for exposure.
 
-The `layouts\2026-09-11-afternoon` folder contains the recorded click positions,
-OCR rectangle, reference images, and expected browser viewport size (2542x1455).
+All four DWL programs automatically load the [layout folder](layout/) beside
+the scripts, even when launched from another working directory. It contains the
+recorded click positions, OCR rectangle, reference images, and expected browser
+viewport size (2542x1455).
 On a startup size mismatch, choose **Restore saved size**, **Check again**, or
 **Stop the script**. Restore changes the browser size and requires an exact
-match before continuing. Changes to the actual panel arrangement require
-redefining the affected entries or choosing a new layout folder.
+match before continuing. If a panel moves, restore its position or redefine
+the affected entries in `layout/`.
 
 During a comparison with a delay or retries, choose **Final compare now** to
 take one fresh comparison immediately and cancel the remaining retries. A
@@ -204,7 +206,7 @@ The crosshair and magnified view show where the click will land. Choose
 **Back to step** to return to the same pause. Open the preview again to refresh it.
 
 To move the target, choose **Reassign click location** and click the new
-target on the frozen screenshot. The point is saved in the selected layout.
+target on the frozen screenshot. The point is saved in `layout/`.
 Choose **Next Step** when ready to send the click.
 Canceling the picker leaves the old point unchanged and returns to the pause.
 Closing a click-step dialog stops the script. Reassignment sends no input to
@@ -240,7 +242,7 @@ from the DWL repository folder. When resuming with the same carrier still
 seated, go directly to the production command.
 
 ```powershell
-.\.venv\Scripts\python.exe real-dwl.py --layout "layouts\2026-09-11-afternoon"
+.\run.bat
 ```
 
 At startup the script uses `plate-calibration.json` beside `real-dwl.py`, or
@@ -248,11 +250,11 @@ the file specified by `--transform-file`. A missing file triggers automatic
 calibration. Each move logs the local and stage targets in µm and rounds the
 stage coordinates to whole µm for Move absolute and its OCR check.
 
-Omit `--layout` to choose a folder interactively. If Tesseract is installed in a
-different location, use an explicit path, for example:
+If Tesseract is installed in a different location, specify its path with
+`--tesseract-cmd`.
 
 ```powershell
-.\.venv\Scripts\python.exe real-dwl.py --layout "layouts\2026-09-11-afternoon" --tesseract-cmd "C:\Program Files\Tesseract-OCR\tesseract.exe"
+.\run.bat --tesseract-cmd "C:\Program Files\Tesseract-OCR\tesseract.exe"
 ```
 
 The script starts in single-step mode. Advance with the operator controls or
@@ -334,14 +336,14 @@ Keep the rest of the file and resume.
 
 ## Test a plate calibration with three corners
 
-Use the existing layout and select `Find wafer center optical`. Disable the
+Select `Find wafer center optical`. Disable the
 setting that zeros X/Y after center finding, and keep the stage origin and
 rotation unchanged throughout this test. Start with the head raised at Z=0
 and the usual nominal plate coordinate system. The test moves and focuses,
 but does not expose or change the production script.
 
 ```powershell
-.\.venv\Scripts\python.exe calibrate-plate.py --layout "layouts\2026-09-11-afternoon"
+.\.venv\Scripts\python.exe calibrate-plate.py
 ```
 
 The script starts in single-step mode and retains the click reassignment,

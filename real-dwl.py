@@ -7,7 +7,9 @@ import time
 import playwrightscriptlib as psl
 from batch_calibration import BatchCalibration
 from batch_state import BatchState
-from dwl_actions import check_frame, click, focus, optical_center_find, read_xy, send_absolute_move
+from dwl_actions import (
+    LAYOUT_DIR, check_frame, click, focus, optical_center_find, read_xy, send_absolute_move,
+)
 from plate_transform import load_plate_calibration, plate_position
 from xy_readout import POSITION_TOLERANCE_UM, TesseractReader, parse_xy_integers, require_xy_position
 
@@ -21,7 +23,6 @@ def parse_args():
     folder = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description="Run the DWL step-and-expose sequence.")
     parser.add_argument("url", nargs="?", default="http://127.0.0.1:9222")
-    parser.add_argument("--layout", type=Path, help="Screen layout folder; omit to choose interactively")
     parser.add_argument("--run-list", type=Path, default=folder / "run-list.txt",
                         help="Ordered disk positions (default: run-list.txt beside this script)")
     parser.add_argument("--skip-list", type=Path, default=folder / "skip-list.txt",
@@ -39,7 +40,7 @@ def connect_to_machine(args):
     ocr_cmd = TesseractReader(args.tesseract_cmd).executable
     psl.info("Connecting to the browser")
     psl.connect(args.url, page_hint="remotedesktop.google.com")
-    psl.loadLayout(args.layout)
+    psl.loadLayout(LAYOUT_DIR)
     psl.checkViewport()
     psl.enableClickGuard("crd-popup", timeout=30, referenceScreenshot=args.crd_popup_screenshot)
     psl.clicksSettleTime(CLICK_SETTLE_SECONDS)
