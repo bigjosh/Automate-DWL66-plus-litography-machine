@@ -209,6 +209,14 @@ class RequiredPositionTests(unittest.TestCase):
                 with self.assertRaises(xy_readout.ReadoutError):
                     xy_readout.require_xy_position(text, "10", "-20")
 
+    def test_adjustable_position_tolerance(self):
+        text = "X=10, Y=-21.5 µm"
+        self.assertEqual(xy_readout.require_xy_position(text, 10, -20, tolerance=1),
+                         (Decimal(10), Decimal(-21)))
+        for limit in (0.9999, -1, "NaN", "Infinity", "invalid"):
+            with self.subTest(limit=limit), self.assertRaises(xy_readout.ReadoutError):
+                xy_readout.require_xy_position(text, 10, -20, tolerance=limit)
+
     def test_invalid_or_fractional_commanded_values_fail(self):
         for expected_x, expected_y in (("NaN", "0"), ("0", "Infinity"),
                                        ("invalid", "0"), ("0", None),

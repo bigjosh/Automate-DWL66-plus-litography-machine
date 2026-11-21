@@ -6,13 +6,14 @@ All GUI imports and dialogs are deferred until explicitly requested.
 """
 
 import json
+import math
 import os
 from pathlib import Path
 import re
 import tempfile
 import uuid
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 
 class LayoutError(Exception):
@@ -430,7 +431,92 @@ def show_click_preview(name, img, point):
             pass
 
 
-def ocr_dialog(name, crop, text, *, error=None,
+def show_ocr_region(name, screenshot, box):
+    """Show the OCR bounds on the full screenshot used for that reading."""
+    import tkinter as tk
+    from PIL import ImageTk
+    if not isinstance(screenshot, Image.Image) or min(screenshot.size) <= 0:
+        raise LayoutError("OCR region preview requires a nonempty screenshot.")
+    if (not _integers(box, 4) or not 0 <= box[0] < box[2] <= screenshot.width
+            or not 0 <= box[1] < box[3] <= screenshot.height):
+        raise LayoutError("OCR region %r is outside the screenshot." % (box,))
+    x1, y1, x2, y2 = box
+    root = _root("OCR capture region — %s" % name)
+    try:
+        tk.Label(root, text="%s   (x=%d, y=%d)   %d × %d pixels" %
+                 (name, x1, y1, x2 - x1, y2 - y1), font=("Segoe UI", 12, "bold")).pack(pady=4)
+        overview = screenshot.convert("RGB")
+        overview.thumbnail((max(1, int(root.winfo_screenwidth() * 0.9)),
+                            max(1, int(root.winfo_screenheight() * 0.76))), Image.LANCZOS)
+        # Pillow draws through its last pixel. Convert the exclusive crop ends
+        # to inclusive display pixels, including single-pixel crops at the edge.
+        left = x1 * overview.width // screenshot.width
+        top = y1 * overview.height // screenshot.height
+        right = (x2 * overview.width - 1) // screenshot.width
+        bottom = (y2 * overview.height - 1) // screenshot.height
+        draw = ImageDraw.Draw(overview)
+        draw.rectangle((left - 1, top - 1, right + 1, bottom + 1), outline="black")
+        draw.rectangle((left, top, right, bottom), outline="yellow")
+        photo = ImageTk.PhotoImage(overview, master=root)
+        tk.Label(root, image=photo, borderwidth=0).pack(padx=8)
+        tk.Button(root, text="Back to OCR check", command=root.destroy).pack(pady=6)
+        root.bind("<Escape>", lambda event: root.destroy())
+        root.protocol("WM_DELETE_WINDOW", root.destroy)
+        root.lift()
+        root.wait_window(root)
+    finally:
+        try:
+            root.destroy()
+        except tk.TclError:
+            pass
+
+
+def prompt_ocr_margin(name, current_margin):
+    """Return the chosen error margin in µm, or None when canceled."""
+    import tkinter as tk
+    root = _root("Change OCR margin — %s" % name)
+    margin = None
+    try:
+        tk.Label(root, text="Allowed error (µm) for this check of %s" % name,
+                 wraplength=500, justify="left").pack(padx=16, pady=(12, 4), anchor="w")
+        entry = tk.Entry(root)
+        entry.insert(0, str(current_margin))
+        entry.pack(padx=16, fill="x")
+        entry.selection_range(0, "end")
+        entry.focus_set()
+        status = tk.Label(root, text="", fg="#b00020")
+        status.pack(padx=16, anchor="w")
+
+        def apply_margin(event=None):
+            nonlocal margin
+            try:
+                value = float(entry.get())
+                if not math.isfinite(value) or value < 0:
+                    raise ValueError
+            except ValueError:
+                status.configure(text="Enter a finite number greater than or equal to zero.")
+                return
+            margin = value
+            root.destroy()
+
+        row = tk.Frame(root)
+        row.pack(padx=16, pady=(4, 12), anchor="e")
+        tk.Button(row, text="Cancel", command=root.destroy).pack(side="left", padx=4)
+        tk.Button(row, text="Apply margin", command=apply_margin).pack(side="left", padx=4)
+        root.bind("<Return>", apply_margin)
+        root.bind("<Escape>", lambda event: root.destroy())
+        root.protocol("WM_DELETE_WINDOW", root.destroy)
+        root.lift()
+        root.wait_window(root)
+        return margin
+    finally:
+        try:
+            root.destroy()
+        except tk.TclError:
+            pass
+
+
+def ocr_dialog(name, crop, text, *, error=None, alarm=False,
                buttons=("Next Step", "Run Continuously", "Redefine OCR area", "STOP")):
     """Review an OCR crop/result and return the selected button's index.
 
@@ -438,7 +524,8 @@ def ocr_dialog(name, crop, text, *, error=None,
     layout writes, or target input occurs here. The last button must be the
     stop/cancel choice: Escape and window close select it. crop may be None
     when error explains why no pixels are available. Raw text is shown with
-    repr so whitespace and line endings remain visible.
+    repr so whitespace and line endings remain visible. Set alarm=True when
+    automatic retries are exhausted to highlight the failed check.
     """
     import tkinter as tk
     if crop is not None and (not isinstance(crop, Image.Image) or min(crop.size) <= 0):
@@ -451,11 +538,15 @@ def ocr_dialog(name, crop, text, *, error=None,
             or any(not isinstance(label, str) or not label for label in buttons)):
         raise LayoutError("OCR review requires a nonempty sequence of button labels.")
 
-    root = _root("OCR area — %s" % name)
+    root = _root(("ALARM — OCR check failed — %s" if alarm else "OCR area — %s") % name)
     result = {"choice": len(buttons) - 1}
     try:
-        tk.Label(root, text="OCR area: %s" % name, font=("Segoe UI", 13, "bold"),
-                 justify="left", wraplength=700).pack(padx=15, pady=(12, 6), anchor="w")
+        if alarm:
+            tk.Label(root, text="ALARM — OCR check failed for %s" % name, bg="#b00020", fg="white",
+                     font=("Segoe UI", 16, "bold"), wraplength=700).pack(fill="x", ipady=6)
+        else:
+            tk.Label(root, text="OCR area: %s" % name, font=("Segoe UI", 13, "bold"),
+                     justify="left", wraplength=700).pack(padx=15, pady=(12, 6), anchor="w")
         if crop is not None:
             tk.Label(root, text="Current crop: %d x %d pixels. Preview is 1:1; scroll if needed."
                      % crop.size, font=("Segoe UI", 10), justify="left",

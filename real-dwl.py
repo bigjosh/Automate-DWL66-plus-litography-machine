@@ -2,15 +2,19 @@
 import argparse
 import time
 from pathlib import Path
-from tabnanny import check
 
 import playwrightscriptlib as psl
+from batch_state import BatchState
 from plate_transform import load_plate_calibration, plate_position
-from xy_readout import POSITION_TOLERANCE_UM, TesseractReader, require_xy_position
+from xy_readout import POSITION_TOLERANCE_UM, TesseractReader, parse_xy_integers, require_xy_position
 
 parser = argparse.ArgumentParser(description="Run the DWL step-and-expose sequence using a saved screen layout.")
 parser.add_argument("url", nargs="?", default="http://127.0.0.1:9222")
 parser.add_argument("--layout", type=Path, help="Layout folder; omit to choose a folder interactively")
+parser.add_argument("--run-list", type=Path, default=Path(__file__).resolve().with_name("run-list.txt"),
+                    help="Ordered disk positions (default: run-list.txt beside this script)")
+parser.add_argument("--skip-list", type=Path, default=Path(__file__).resolve().with_name("skip-list.txt"),
+                    help="Batch exposure record (default: skip-list.txt beside this script)")
 parser.add_argument("--transform-file", type=Path,
                     default=Path(__file__).resolve().with_name("plate-calibration.json"),
                     help="Plate calibration JSON (default: plate-calibration.json beside this script)")
@@ -22,81 +26,44 @@ args = parser.parse_args()
 psl.logging(True)
 psl.screenshotOnInfo(True)                      # screen before ever info() saved to screenshots/ 
 psl.alarmOnError()
-psl.info(f"Loading plate calibration from {args.transform_file.resolve()}")
-spacing, plate_to_stage = load_plate_calibration(args.transform_file)
-psl.info('Checking Tesseract OCR and English language data')
-ocr_reader = TesseractReader(args.tesseract_cmd)
-psl.info('Connecting to the browser')
-psl.connect(args.url, page_hint='remotedesktop.google.com')
-psl.loadLayout(args.layout)
-psl.checkViewport()
-psl.enableClickGuard('crd-popup', timeout=30, referenceScreenshot=args.crd_popup_screenshot)
-
 CLICK_SETTLE_SECONDS = 1
-psl.clicksSettleTime(CLICK_SETTLE_SECONDS)
-
-# shoould we wait for input after each step? 
-# comment out the next line to run the script without pausing
-psl.pauseOnInfo(True)
 
 # set to true to actual run an exposure - otherwsie does everything else but.
 wetrun=True
-
-# Row 0 is the line of disks closest to the machgine door
-# Col 0 is the row of disks closest to the left side of the machine when looking at it from the front
-
-# (row, col) positions to skip
-skiplist = [
-     (0, 0), 
-     (0, 1),
-     (0, 2),
-    (0, 3),
-    (0, 4),
-    (0, 5),
-    # (1, 0),
-    # (1, 1),
-    # (1, 2),
-    # (1, 3),
-    # (1, 4),
-    # (1, 5),
-    # (2, 0),
-    # (2, 1),
-    # (2, 2),
-    # (2, 3),
-    # (2, 4),
-    # (2, 5),
-    # (3, 0),
-    # (3, 1),
-    # (3, 2),
-    # (3, 3),
-    # (3, 4),
-    # (3, 5),
-    # (4, 0),
-    # (4 ,1),
-    # (4 ,2),
-    # (4 ,3),
-    # (4 ,4),
-    # (4 ,5),
-    # (5, 0),
-    # (5, 1),
-    # (5, 2),
-    # (5, 3),
-    # (5, 4),
-    # (5, 5),
-]
 
 def require_frame(name, **options):
     if not psl.verifyFrame(name, **options):
         raise RuntimeError(f"Required check {name!r} did not pass. Stopping this run.")
 
 
-for r in range(0, 6):
+def check_stage_position(expected_x, expected_y, description="X/Y PASS", *, initial_delay=None):
+    text = psl.grabOCRTextLine(
+        'actual-xy', tesseract_cmd=ocr_reader.executable, review=True,
+        retrycount=5, delay=5, initial_delay=initial_delay, margin=POSITION_TOLERANCE_UM,
+        validator=lambda text, margin: require_xy_position(
+            text, expected_x, expected_y, tolerance=margin))
+    actual_x, actual_y = parse_xy_integers(text)
+    psl.info(f'{description}: OCR={text!r}; integer readout X={actual_x}, Y={actual_y} um; '
+             f'expected X={expected_x}, Y={expected_y} um')
 
-    for c in range(0, 6):
 
-        if (r, c) in skiplist:
-            continue        
-    
+with BatchState(args.run_list, args.skip_list) as batch:
+    psl.info(f"Batch has {len(batch.pending)} disk(s) left to start.")
+    if batch.pending:
+        psl.info(f"Loading plate calibration from {args.transform_file.resolve()}")
+        spacing, plate_to_stage = load_plate_calibration(args.transform_file)
+        psl.info('Checking Tesseract OCR and English language data')
+        ocr_reader = TesseractReader(args.tesseract_cmd)
+        psl.info('Connecting to the browser')
+        psl.connect(args.url, page_hint='remotedesktop.google.com')
+        psl.loadLayout(args.layout)
+        psl.checkViewport()
+        psl.enableClickGuard('crd-popup', timeout=30, referenceScreenshot=args.crd_popup_screenshot)
+        psl.clicksSettleTime(CLICK_SETTLE_SECONDS)
+        psl.pauseOnInfo(True)
+
+    # Row 0 is nearest the machine door. Column 0 is on the left when facing the machine.
+    for r, c in batch.pending:
         psl.info(f"*** Starting cycle for row {r}, column {c} ***")
 
         local_x, local_y = plate_position(r, c, spacing)
@@ -131,14 +98,7 @@ for r in range(0, 6):
         # psl.info("Screen test check center is at 0,0  (matchLevel 0.99)")
         # psl.verifyFrame('xy-zero-check', matchLevel=0.99, message='Screen does not match checkxy')
 
-        # Require strict X=/Y= integer prefixes on both axes.
-        # here we check that we are at 0,0 after centering
-        raw_xy_afetr_center = psl.grabOCRTextLine(
-            'actual-xy', tesseract_cmd=ocr_reader.executable, review=True,
-            validator=lambda text: require_xy_position(text, 0, 0))
-        actual_x_after_center, actual_y_after_center = require_xy_position(raw_xy_afetr_center, 0, 0)
-        psl.info(f'X/Y PASS: OCR={raw_xy_afetr_center!r}; integer readout X={actual_x_after_center}, Y={actual_y_after_center} um; '
-                 f'expected X=0, Y=0 um; both integer errors within +/-{POSITION_TOLERANCE_UM} um')
+        check_stage_position(0, 0)
 
 
         # execute global alignment
@@ -181,12 +141,7 @@ for r in range(0, 6):
         psl.wait(5) 
 
         # Verify the calibrated stage command before focusing.
-        raw_xy = psl.grabOCRTextLine(
-            'actual-xy', tesseract_cmd=ocr_reader.executable, review=True,
-            validator=lambda text: require_xy_position(text, xpos, ypos))
-        actual_x, actual_y = require_xy_position(raw_xy, xpos, ypos)
-        psl.info(f'X/Y PASS: OCR={raw_xy!r}; integer readout X={actual_x}, Y={actual_y} um; '
-                 f'expected X={xpos}, Y={ypos} um; both integer errors within +/-{POSITION_TOLERANCE_UM} um')
+        check_stage_position(xpos, ypos)
 
         psl.info('Focus at the verified disk center', point='focus-button')
         psl.click('focus-button')
@@ -202,11 +157,7 @@ for r in range(0, 6):
         psl.click('set-zero-button')
         # Give the X/Y display five seconds to update, including the click's settle time.
         time.sleep(max(0, 5 - CLICK_SETTLE_SECONDS))
-        raw_origin = psl.grabOCRTextLine(
-            'actual-xy', tesseract_cmd=ocr_reader.executable, review=True,
-            validator=lambda text: require_xy_position(text, 0, 0))
-        require_xy_position(raw_origin, 0, 0)
-        psl.info(f'Disk origin verified after Set zero: {raw_origin!r}')
+        check_stage_position(0, 0, 'Disk origin verified after Set zero', initial_delay=0)
 
         # job tab
         psl.info('Click job-tab -- job tab', point='job-tab')
@@ -231,7 +182,8 @@ for r in range(0, 6):
 
             # START WRITING
             psl.info('Click laser-confirm -- START WRITING', point='laser-confirm')
-            psl.click('laser-confirm')
+            with batch.starting_exposure((r, c)):
+                psl.click('laser-confirm')
 
             # # The actual write job running
             # now in the verifyframe below, so we dont need to wait here

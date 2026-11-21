@@ -16,7 +16,8 @@ import playwrightscriptlib as psl
 
 
 NORMAL = ("Next Step", "Run Continuously", "Redefine OCR area", "STOP")
-ERROR = ("Retry", "Redefine OCR area", "STOP")
+ERROR = ("Retry", "Redefine OCR area", "Show capture region", "STOP")
+MARGIN_ERROR = ("Retry", "Redefine OCR area", "Show capture region", "Change margin", "STOP")
 CONFIRM = ("Save OCR area", "Select again", "Cancel")
 
 
@@ -44,6 +45,8 @@ class OCRRegionRecoveryTests(unittest.TestCase):
         self.patch(psl, "_pause_on_info", True)
         self.patch(psl, "_shot_dir", None)
         self.patch(psl, "_emit")
+        self.patch(psl, "_beep_loop")
+        self.sleep = self.patch(psl.time, "sleep")
         self.patch(psl, "info", side_effect=AssertionError("Unexpected nested pause"))
         self.patch(psl, "alarm", side_effect=AssertionError("Unexpected generic alarm"))
         self.viewport = self.patch(psl, "viewportSize", return_value=(640, 480))
@@ -51,6 +54,8 @@ class OCRRegionRecoveryTests(unittest.TestCase):
         self.reader = mock.Mock(return_value="X=0, Y=0 um\n")
         self.patch(psl._ocr, "TesseractReader", return_value=self.reader)
         self.dialog = self.patch(layouts, "ocr_dialog", create=True, side_effect=[0])
+        self.show_region = self.patch(layouts, "show_ocr_region", create=True)
+        self.margin_prompt = self.patch(layouts, "prompt_ocr_margin", create=True)
         self.picker = self.patch(layouts, "pick_on_image", return_value=self.new_box)
         self.patch(layouts, "prompt_definition", side_effect=AssertionError("Unexpected definition prompt"))
         self.patch(layouts, "confirm_reference", side_effect=AssertionError("OCR region is not a reference frame"))
@@ -76,6 +81,10 @@ class OCRRegionRecoveryTests(unittest.TestCase):
     def buttons(self, index):
         return tuple(self.dialog.call_args_list[index].kwargs["buttons"])
 
+    def choose(self, *labels):
+        labels = iter(labels)
+        self.dialog.side_effect = lambda *args, buttons, **kwargs: buttons.index(next(labels))
+
     def assert_unchanged(self):
         self.assertEqual(self.metadata.read_bytes(), self.original)
 
@@ -90,6 +99,121 @@ class OCRRegionRecoveryTests(unittest.TestCase):
         with self.assertRaisesRegex(psl.OCRError, "Cannot read"):
             psl.grabOCRTextLine("actual-xy")
         self.dialog.assert_not_called()
+
+    def test_retries_read_fresh_pixels_after_each_delay_and_stop_on_match(self):
+        psl._pause_on_info = False
+        actions = []
+        colors = iter([32, 96, 128])
+
+        def capture():
+            shade = next(colors)
+            actions.append(("capture", shade))
+            return Image.new("RGB", self.screen.size, (shade, 0, 0))
+
+        self.capture.side_effect = capture
+        self.sleep.side_effect = lambda seconds: actions.append(("wait", seconds))
+        self.reader.side_effect = lambda crop: str(crop.getpixel((0, 0))[0])
+        self.assertEqual(self.read(retrycount=5, delay=5, validator=lambda text: text == "128"),
+                         "128")
+        self.assertEqual(actions, [
+            ("wait", 5), ("capture", 32), ("wait", 5), ("capture", 96),
+            ("wait", 5), ("capture", 128),
+        ])
+        self.dialog.assert_not_called()
+
+    def test_unreviewed_exhaustion_raises_last_read_error_without_alarm(self):
+        self.reader.side_effect = [psl.OCRError("first miss"), psl.OCRError("last miss")]
+        with self.assertRaisesRegex(psl.OCRError, "last miss"):
+            psl.grabOCRTextLine("actual-xy", retrycount=2, delay=5)
+        self.assertEqual(self.capture.call_count, 2)
+        self.assertEqual(self.sleep.call_args_list, [mock.call(5)] * 2)
+        self.dialog.assert_not_called()
+
+    def test_exhausted_alarm_shows_exact_failed_screen_and_keeps_read_blocked(self):
+        psl._pause_on_info = False
+        shots = [Image.new("RGB", self.screen.size, (i, 0, 0)) for i in range(5)]
+        self.capture.side_effect = shots
+        self.reader.side_effect = lambda crop: str(crop.getpixel((0, 0))[0])
+        self.choose("Show capture region", "STOP")
+        with self.assertRaises(SystemExit) as stopped:
+            self.read(retrycount=5, delay=5, validator=lambda text: False)
+        self.assertEqual(stopped.exception.code, 2)
+        self.assertEqual(self.capture.call_count, 5)
+        self.assertEqual(self.sleep.call_args_list, [mock.call(5)] * 5)
+        self.show_region.assert_called_once_with("actual-xy", shots[-1], self.old_box)
+        self.assertEqual(self.dialog.call_count, 2)
+        for call in self.dialog.call_args_list:
+            self.assertTrue(call.kwargs["alarm"])
+            self.assertEqual(tuple(call.kwargs["buttons"]), ERROR)
+            self.assertEqual(call.args[2], "4")
+        self.assert_unchanged()
+
+    def test_manual_retry_starts_another_full_attempt_budget(self):
+        psl._pause_on_info = False
+        self.reader.side_effect = ["miss", "miss", "miss", "match"]
+        self.choose("Retry")
+        self.assertEqual(self.read(retrycount=2, delay=5, validator=lambda text: text == "match"),
+                         "match")
+        self.assertEqual(self.capture.call_count, 4)
+        self.assertEqual(self.sleep.call_args_list, [mock.call(5)] * 4)
+        self.assertEqual(self.buttons(0), ERROR)
+        self.assertEqual(self.dialog.call_count, 1)
+
+    def test_initial_delay_zero_skips_only_first_wait_even_across_manual_retry(self):
+        psl._pause_on_info = False
+        events = []
+
+        def capture():
+            events.append("capture")
+            return self.screen.copy()
+
+        self.sleep.side_effect = lambda seconds: events.append(("wait", seconds))
+        self.capture.side_effect = capture
+        self.reader.side_effect = ["miss", "miss", "miss", "match"]
+        self.choose("Retry")
+        result = self.read(retrycount=2, delay=5, initial_delay=0,
+                           validator=lambda text: text == "match")
+        self.assertEqual(result, "match")
+        self.assertEqual(self.dialog.call_count, 1)
+        self.assertEqual(events, [
+            "capture", ("wait", 5), "capture", ("wait", 5), "capture", ("wait", 5), "capture",
+        ])
+
+    def test_margin_edit_revalidates_fresh_values_and_requires_operator_to_proceed(self):
+        psl._pause_on_info = False
+        self.reader.side_effect = ["10", "11", "12"]
+        self.margin_prompt.return_value = 12
+        validator = mock.Mock(side_effect=lambda text, margin: int(text) <= margin)
+        self.choose("Change margin", "Next Step")
+        self.assertEqual(self.read(validator=validator, margin=5), "12")
+        self.assertEqual(validator.call_args_list, [
+            mock.call("10", 5), mock.call("11", 12), mock.call("12", 12),
+        ])
+        self.assertEqual([self.buttons(0), self.buttons(1)], [MARGIN_ERROR, NORMAL])
+        self.margin_prompt.assert_called_once_with("actual-xy", 5)
+        self.assertEqual(self.capture.call_count, 3)
+        self.assert_unchanged()
+        # An edit for one disk must not loosen the next disk's check.
+        self.reader.side_effect = None
+        self.reader.return_value = "12"
+        self.choose("STOP")
+        with self.assertRaises(SystemExit):
+            self.read(validator=validator, margin=5)
+        validator.assert_called_with("12", 5)
+        self.assertEqual(self.buttons(2), MARGIN_ERROR)
+
+    def test_cancel_margin_returns_to_alarm_without_changing_current_value(self):
+        psl._pause_on_info = False
+        self.reader.return_value = "10"
+        self.margin_prompt.side_effect = [None, 8]
+        validator = mock.Mock(side_effect=lambda text, margin: int(text) <= margin)
+        self.choose("Change margin", "Change margin", "STOP")
+        with self.assertRaises(SystemExit):
+            self.read(validator=validator, margin=5)
+        self.assertEqual(self.margin_prompt.call_args_list, [mock.call("actual-xy", 5)] * 2)
+        self.assertEqual(validator.call_args_list, [mock.call("10", 5), mock.call("10", 8)])
+        self.assertEqual([self.buttons(i) for i in range(3)], [MARGIN_ERROR] * 3)
+        self.assert_unchanged()
 
     def test_setup_failure_stops_before_capture_or_recovery_ui(self):
         with mock.patch.object(psl._ocr, "TesseractReader",
@@ -121,7 +245,7 @@ class OCRRegionRecoveryTests(unittest.TestCase):
 
     def test_fresh_validation_failure_after_next_step_cannot_return_success(self):
         self.reader.side_effect = ["X=0, Y=0 um", "X=999, Y=999 um"]
-        self.dialog.side_effect = [0, 2]
+        self.choose("Next Step", "STOP")
 
         def validate(text):
             if "999" in text:
@@ -151,14 +275,16 @@ class OCRRegionRecoveryTests(unittest.TestCase):
 
     def test_false_validator_result_is_a_failure_with_no_skip_option(self):
         psl._pause_on_info = False
-        self.dialog.side_effect = [2]
+        self.choose("STOP")
         with self.assertRaises(SystemExit):
             self.read(validator=lambda text: False)
         self.assertEqual(self.buttons(0), ERROR)
 
     def test_unexpected_validator_failure_propagates_without_recovery_dialog(self):
         with self.assertRaisesRegex(RuntimeError, "Programming error"):
-            self.read(validator=mock.Mock(side_effect=RuntimeError("Programming error")))
+            self.read(validator=mock.Mock(side_effect=RuntimeError("Programming error")),
+                      retrycount=5, delay=5)
+        self.assertEqual(self.reader.call_count, 1)
         self.dialog.assert_not_called()
 
     def test_redefine_saves_only_region_after_confirmation_and_returns_to_pause(self):
@@ -227,7 +353,7 @@ class OCRRegionRecoveryTests(unittest.TestCase):
 
     def test_candidate_geometry_can_be_saved_but_wrong_position_still_blocks(self):
         self.reader.return_value = "X=999, Y=999 um"
-        self.dialog.side_effect = [1, 0, 2]
+        self.choose("Redefine OCR area", "Save OCR area", "STOP")
         validator = mock.Mock(side_effect=psl.OCRError("Position outside tolerance"))
         with self.assertRaises(SystemExit):
             self.read(validator=validator)

@@ -165,8 +165,9 @@ Before starting the production script:
   is loaded on the Jobs tab.
 - Put the laser writer software on the right-hand monitor, maximized, with
   the panels arranged to match the selected layout.
-- Check `skiplist` and `wetrun` in `real-dwl.py`. `wetrun=True` enables exposure;
-  `wetrun=False` still performs machine movement and focusing.
+- Review the [batch files](#batch-tracking-and-recovery) for the tray being run.
+  In `real-dwl.py`, `wetrun=True` enables exposure. With `wetrun=False`, the
+  script still moves and focuses, and the disks remain eligible for exposure.
 
 The `layouts\2026-09-11-afternoon` folder contains the recorded click positions,
 OCR rectangle, reference images, and expected browser viewport size (2542x1455).
@@ -217,15 +218,20 @@ its crop and OCR result before choosing **Save OCR area**. Allow enough width
 for both full coordinates, including minus signs and five-digit values.
 All three checks share `actual-xy`, so one saved change applies to all three.
 
-Saving returns to a paused preview; **Next Step** reads fresh pixels and checks
-the X/Y values before proceeding. Cancel preserves the previous rectangle.
-OCR or position-validation failures offer **Retry**, **Redefine OCR area**, or
-**STOP**, including in continuous mode. There is no skip option. Retry reads
-again without repeating a move, focus, or exposure. Production accepts an
-integer readout within ±500 µm (±0.5 mm) of the target on each axis. A proposed
-area must produce one readable text line before it can be saved; that does not accept its position
-values. OCR installation, viewport, screenshot, and save failures still stop
-the operation. Restart the script to load this feature.
+Production and calibration each try up to five fresh OCR reads. The delay is
+five seconds before each capture. After **Set zero**, the first read uses the
+five seconds the script already waits for the display to settle.
+
+If all five readings fail, an audible alarm shows the last crop, recognized
+text, and reason. **Show capture region** marks the rectangle on the exact
+screenshot used for that reading. **Retry** starts another five attempts.
+**Redefine OCR area** saves new bounds in the layout. **Change margin** edits
+the allowed error in µm for this check only. Production starts each check at
+±500 µm (±0.5 mm) per axis.
+
+After editing the rectangle or margin, review the new reading and choose
+**Next Step** to validate fresh pixels before proceeding. **STOP** ends the
+run. Retrying the OCR does not repeat a move, focus, or exposure.
 
 ## Start the production script
 
@@ -259,6 +265,32 @@ For `set-zero-button-image` and `set-zero-button`, select the Stage panel's
 **Set zero** button as the reference image and click point, respectively.
 The CRD popup guard waits up to 30 seconds before mouse clicks and keyboard
 operations; a persistent popup prevents the pending input and raises an error.
+
+### Batch tracking and recovery
+
+The default [run-list.txt](run-list.txt) and local `skip-list.txt` live beside
+`real-dwl.py`. Each position is written on its own line as `(row,col)`. The
+run list ships with all 36 disks in row order. Edit it while the script is
+stopped to change the order or select a subset. Use `--run-list` and
+`--skip-list` to supply alternative file paths.
+
+For a **new batch**, delete the skip list while the script is stopped. The
+next launch creates an empty file. To **resume**, keep the file and run the
+same command again. The script skips every listed position. The earlier
+hardcoded list omitted row 0. If you are finishing an existing tray, copy any
+already-started disks and any positions you still intend to skip into the
+skip list before the first launch.
+
+**Job Start** opens the laser confirmation. The final confirmation starts
+writing, and the script records that disk immediately afterward, before it
+waits for completion. A disk whose exposure was interrupted therefore stays
+in the skip list.
+
+If the script stops during the confirmation click, the skip list can contain
+a line such as `# pending exposure (2,3)`. The next launch stops on that line.
+Check the machine's job history for that disk. If exposure started, replace
+the entire line with `(2,3)`. If it definitely did not start, remove the line.
+Keep the rest of the file and resume.
 
 ## Test a plate calibration with three corners
 
@@ -323,11 +355,10 @@ saved under `runs\plate-calibration-<timestamp>`. Results are saved after
 each center find; `--output-dir` selects a different run folder.
 
 Calibration reads preserve decimal fractions and use the strict whole-line
-parser. Ambiguous OCR offers **Retry**, **Redefine OCR area**, or **STOP**;
-it is not silently repaired. Before each focus, the measured seek position
-must be within +/-50 um of the command on each axis. A found center at least
-half a grid spacing from its command is rejected as a possible wrong disk
-or coordinate reset. These checks do not set an acceptable calibration error.
+parser. Before each focus, the default allowed error is ±50 µm on each axis.
+For a found center, the default limit is a radial distance strictly less than
+half the grid spacing from its command. Larger shifts can indicate a wrong
+disk or coordinate reset. The OCR alarm identifies which check failed.
 On interruption, no automatic recovery motion is sent; inspect the current
 head/stage state before restarting.
 

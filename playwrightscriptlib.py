@@ -40,6 +40,7 @@ import threading
 import time
 import traceback
 import uuid
+from contextlib import contextmanager
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 from playwright.sync_api import sync_playwright
@@ -508,23 +509,25 @@ def frameGrab(x1, y1=None, x2=None, y2=None):
     return _frame_and_full(x1, y1, x2, y2)[0]
 
 
-def _check_ocr_text(text, validator=None):
+def _check_ocr_text(text, validator=None, margin=None):
     text = text.strip()
     if not text:
         raise OCRError("OCR returned no text for the selected rectangle.")
     if len(text.splitlines()) != 1:
         raise OCRError("OCR returned multiple lines; select a rectangle containing one text line.")
-    if validator is not None and validator(text) is False:
-        raise OCRError("OCR text did not pass validation.")
+    if validator is not None:
+        result = validator(text) if margin is None else validator(text, margin)
+        if result is False:
+            raise OCRError("OCR text did not pass validation.")
     return text
 
 
-def _ocr_preview(reader, pixels, validator=None):
+def _ocr_preview(reader, pixels, validator=None, margin=None):
     """Keep the recognized text available even when its validation fails."""
     text = ""
     try:
         text = reader(pixels).strip()
-        return _check_ocr_text(text, validator), None
+        return _check_ocr_text(text, validator, margin), None
     except OCRError as exc:
         return text, str(exc)
 
@@ -576,7 +579,30 @@ def _edit_ocr_region(name, reader, check_context):
         raise _layouts.LayoutCancelled()
 
 
-def _review_ocr_text_line(name, reader, validator):
+def _ocr_attempts(attempts, delay, initial_delay):
+    for attempt in range(1, attempts + 1):
+        wait_seconds = initial_delay if attempt == 1 else delay
+        if wait_seconds:
+            time.sleep(wait_seconds)
+        yield attempt
+
+
+def _ocr_alarm(name, crop, text, error, attempts, margin, buttons):
+    unit = "attempt" if attempts == 1 else "attempts"
+    message = f"OCR {name!r} failed after {attempts} {unit}: {error}"
+    if margin is not None:
+        message += f"\nCurrent margin: {margin:g} µm."
+    with _sounding_alarm(f"{message}\nRecognized text: {text!r}"):
+        try:
+            choice = _layouts.ocr_dialog(name, crop, text, error=message,
+                                         buttons=buttons, alarm=True)
+        except Exception:
+            choice = _alarm_console(message, buttons)
+    _emit("*** Alarm answered: %s" % buttons[choice])
+    return buttons[choice]
+
+
+def _review_ocr_text_line(name, reader, validator, attempts, delay, initial_delay, margin):
     """Read/review/redefine without ever replaying the action before this read."""
     global _pause_on_info
     page = _require_page()
@@ -592,20 +618,51 @@ def _review_ocr_text_line(name, reader, validator):
         selected.check_viewport(expected_viewport)
 
     while True:
-        check_context()
-        pixels = frameGrab(name)
-        check_context()
-        text, error = _ocr_preview(reader, pixels, validator)
-        check_context()
-        _emit("OCR '%s': %r%s" % (name, text, " -- " + error if error else ""))
+        for attempt in _ocr_attempts(attempts, delay, initial_delay):
+            check_context()
+            box = layoutBounds(name)
+            pixels, screen = _frame_and_full(*box)
+            selected.check_viewport(screen.size)
+            check_context()
+            text, error = _ocr_preview(reader, pixels, validator, margin)
+            check_context()
+            _emit(f"OCR {name!r} [{attempt}/{attempts}]: {text!r}"
+                  + (" -- " + error if error is not None else ""))
+            if error is None:
+                break
+        initial_delay = delay
         if error is None and not needs_pause:
             return text
+        alarm_error = error
         while True:
-            buttons = (("Retry", "Redefine OCR area", "STOP") if error is not None else
-                       ("Next Step", "Run Continuously", "Redefine OCR area", "STOP"))
-            choice = _ocr_choice(name, pixels, text, error=error, buttons=buttons)
-            redefine_choice = 1 if error is not None else 2
-            if choice == redefine_choice:
+            if error is not None:
+                buttons = ("Retry", "Redefine OCR area", "Show capture region")
+                if margin is not None:
+                    buttons += ("Change margin",)
+                action = _ocr_alarm(name, pixels, text, alarm_error, attempts, margin, buttons + ("STOP",))
+                alarm_error = error
+            else:
+                buttons = ("Next Step", "Run Continuously", "Redefine OCR area", "STOP")
+                action = buttons[_ocr_choice(name, pixels, text, buttons=buttons)]
+            if action == "Show capture region":
+                try:
+                    _layouts.show_ocr_region(name, screen, box)
+                except Exception as exc:
+                    alarm_error = f"{error}\nCould not show the OCR capture region: {exc}"
+                continue
+            if action == "Change margin":
+                try:
+                    new_margin = _layouts.prompt_ocr_margin(name, margin)
+                except Exception as exc:
+                    alarm_error = f"{error}\nCould not open the OCR margin editor: {exc}"
+                    continue
+                if new_margin is None:
+                    continue
+                margin = _ocr_nonnegative(new_margin, "margin")
+                _emit(f"OCR {name!r}: using margin {margin:g} µm for this check")
+                needs_pause = True
+                break
+            if action == "Redefine OCR area":
                 try:
                     _edit_ocr_region(name, reader, check_context)
                 except _layouts.LayoutCancelled:
@@ -615,12 +672,12 @@ def _review_ocr_text_line(name, reader, validator):
                 # in continuous mode. Show a new paused preview first.
                 needs_pause = True
                 break
-            if choice == 0:
-                if error is None:
-                    needs_pause = False
-                # Retry and Next both take fresh pixels, OCR and validation.
+            if action == "Retry":
                 break
-            if error is None and choice == 1:
+            if action == "Next Step":
+                needs_pause = False
+                break
+            if action == "Run Continuously":
                 _pause_on_info = False
                 needs_pause = False
                 break
@@ -628,8 +685,16 @@ def _review_ocr_text_line(name, reader, validator):
             raise SystemExit(2)
 
 
+def _ocr_nonnegative(value, name):
+    number = float(value)
+    if not math.isfinite(number) or number < 0:
+        raise ValueError(f"OCR {name} must be a finite nonnegative number.")
+    return number
+
+
 def grabOCRTextLine(x1, y1=None, x2=None, y2=None, *, tesseract_cmd=None,
-                    review=False, validator=None):
+                    review=False, validator=None, delay=0, retrycount=0, margin=None,
+                    initial_delay=None):
     """Capture a named layout region and return its text as one string.
 
     Like frameGrab(), accepts either a region name or four rectangle
@@ -645,11 +710,17 @@ def grabOCRTextLine(x1, y1=None, x2=None, y2=None, *, tesseract_cmd=None,
     points and other recognized characters are preserved. This function does
     not parse values itself. Optional validator(text) must raise OCRError or
     return False to reject a reading; its other return values are ignored.
+    Supplying a nonnegative margin in µm calls validator(text, margin).
+    retrycount is the total number of attempts (0 or 1 selects one).
+    delay is in seconds before each fresh capture. initial_delay overrides
+    only the first wait when a caller has already allowed the screen to settle.
 
     review=True requires a named region. In step mode it shows the current
     crop/text and offers Next Step, Run Continuously, Redefine OCR area, STOP.
-    OCR/validation failures offer Retry, Redefine OCR area, STOP in either
-    mode. An edit previews OCR before saving only the region bounds and
+    After exhausting attempts, the audible alarm offers Retry, Redefine OCR
+    area, Show capture region, Change margin (if supplied), and STOP. The
+    screenshot highlights the rectangle used for the failed read. An edited
+    margin applies only to this call. Region editing previews the candidate crop and
     returns to a paused preview. Next always reads and validates fresh pixels.
     Cancel leaves old bounds and the pending dialog intact. No action is
     replayed, and no error can be skipped into a successful return.
@@ -660,13 +731,28 @@ def grabOCRTextLine(x1, y1=None, x2=None, y2=None, *, tesseract_cmd=None,
     """
     if validator is not None and not callable(validator):
         raise TypeError("validator must be callable")
+    if not isinstance(retrycount, int) or retrycount < 0:
+        raise ValueError("OCR retrycount must be a nonnegative integer.")
+    attempts = max(1, retrycount)
+    delay = _ocr_nonnegative(delay, "delay")
+    initial_delay = delay if initial_delay is None else _ocr_nonnegative(initial_delay, "initial_delay")
+    if margin is not None:
+        if validator is None:
+            raise ValueError("An OCR margin requires a validator(text, margin).")
+        margin = _ocr_nonnegative(margin, "margin")
     if review and not (isinstance(x1, str) and y1 is None and x2 is None and y2 is None):
         raise TypeError("OCR review requires a named layout region")
     reader = _ocr.TesseractReader(tesseract_cmd)
     if review:
-        return _review_ocr_text_line(x1, reader, validator)
-    pixels = frameGrab(x1, y1, x2, y2)
-    return _check_ocr_text(reader(pixels), validator)
+        return _review_ocr_text_line(x1, reader, validator, attempts, delay, initial_delay, margin)
+    for attempt in _ocr_attempts(attempts, delay, initial_delay):
+        pixels = frameGrab(x1, y1, x2, y2)
+        try:
+            return _check_ocr_text(reader(pixels), validator, margin)
+        except OCRError as exc:
+            if attempt == attempts:
+                raise
+            _emit(f"OCR attempt {attempt}/{attempts} failed: {exc}")
 
 
 def loadFrame(path):
@@ -2091,6 +2177,19 @@ def _alarm_console(message, buttons):
             return int(s) - 1
 
 
+@contextmanager
+def _sounding_alarm(message):
+    _emit("*** ALARM: %s" % message)
+    stop = threading.Event()
+    beeper = threading.Thread(target=_beep_loop, args=(stop,), daemon=True)
+    beeper.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        beeper.join(timeout=2)
+
+
 def alarm(message, buttons=("Acknowledge",)):
     """Show message on this computer and beep loudly until an operator answers.
 
@@ -2100,18 +2199,11 @@ def alarm(message, buttons=("Acknowledge",)):
     is available; closing the window (or console EOF) counts as the LAST
     button, so put the safe/abort choice last.
     """
-    _emit("*** ALARM: %s" % message)
-    stop = threading.Event()
-    beeper = threading.Thread(target=_beep_loop, args=(stop,), daemon=True)
-    beeper.start()
-    try:
+    with _sounding_alarm(message):
         try:
             choice = _alarm_window(message, tuple(buttons))
         except Exception:
             choice = _alarm_console(message, tuple(buttons))
-    finally:
-        stop.set()
-        beeper.join(timeout=2)
     _emit("*** Alarm answered: %s" % buttons[choice])
     return choice
 

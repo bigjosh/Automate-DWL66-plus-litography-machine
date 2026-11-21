@@ -4,6 +4,7 @@ The production Playwright library is never imported by these tests. OCR setup
 and pixel reads are also faked, so executing the script cannot operate hardware.
 """
 
+from ast import literal_eval
 from pathlib import Path
 import re
 import runpy
@@ -26,7 +27,7 @@ class FakePSL(ModuleType):
     """Only explicitly defined methods are available; none has live effects."""
 
     def __init__(self, read_results=None, *, center_read_results=None,
-                 zero_read_results=None, skip_check=None):
+                 zero_read_results=None, skip_check=None, margin_changes=None):
         super().__init__("playwrightscriptlib")
         self.events = []
         self.moves = []
@@ -42,6 +43,7 @@ class FakePSL(ModuleType):
         self.read_results = read_results or {}
         self.center_read_results = center_read_results or {}
         self.zero_read_results = zero_read_results or {}
+        self.margin_changes = margin_changes or {}
         self.skip_check = skip_check
 
     def logging(self, enabled):
@@ -120,9 +122,12 @@ class FakePSL(ModuleType):
     def wait(self, seconds):
         self.events.append(("wait", seconds))
 
-    def grabOCRTextLine(self, name, *, tesseract_cmd, review=False, validator=None):
+    def grabOCRTextLine(self, name, *, tesseract_cmd, review, validator, retrycount,
+                        delay, margin, initial_delay=None):
         if not review or not callable(validator):
             raise AssertionError("Production XY reads require review/recovery and position validation")
+        if (retrycount, delay, margin) != (5, 5, 500):
+            raise AssertionError("Expected five OCR attempts, five-second spacing, and a 500 µm margin")
         if self.pending_read is None:
             raise AssertionError("OCR read requires a fresh center, absolute move or Set zero")
         phase, x, y = self.pending_read
@@ -135,6 +140,7 @@ class FakePSL(ModuleType):
         index = len(phase_reads)
         self.reads.append((name, tesseract_cmd))
         phase_reads.append((name, tesseract_cmd))
+        self.wait(delay if initial_delay is None else initial_delay)
         self.events.append(("read", phase, index))
         if callable(results):
             result = results(index, x, y)
@@ -144,7 +150,7 @@ class FakePSL(ModuleType):
                 result = result(x, y)
         if isinstance(result, BaseException):
             raise result
-        validator(result)
+        validator(result, self.margin_changes.get((phase, index), float(margin)))
         return result
 
 
@@ -153,12 +159,16 @@ class RealDWLXYGateTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.calibration = Path(temporary.name) / 'plate-calibration.json'
+        self.run_list = self.calibration.with_name("run-list.txt")
+        self.skip_list = self.calibration.with_name("skip-list.txt")
+        self.positions = [(5, 0), (0, 1), (2, 4)]
+        self.run_list.write_text("".join(f"({r},{c})\n" for r, c in self.positions),
+                                 encoding="utf-8")
         plate_transform.save_calibration(
             self.calibration, plate_transform.RigidTransform(1, 0, 0, 0),
             spacing=28489, calibration_points=[{'row': 0, 'col': 0}, {'row': 5, 'col': 5}])
-        # Grid, skiplist and exposure enablement are operator configuration.
-        # Record the current sequence with valid readbacks using only this fake
-        # API; subsequent cases change OCR results, never the production source.
+        # Capture a reference run in deliberately non-grid order using only
+        # temporary batch files. The operator's actual batch stays untouched.
         self.reference = FakePSL()
         self.config = self.run_script(self.reference)
 
@@ -166,22 +176,95 @@ class RealDWLXYGateTests(unittest.TestCase):
         if len(self.reference.moves) < minimum:
             self.skipTest(f"Operator configuration enables fewer than {minimum} cycles")
 
-    def run_script(self, fake, *, preflight_error=None, use_default_calibration=False):
+    def run_script(self, fake, *, preflight_error=None, use_default_calibration=False,
+                   resume=False, script=SCRIPT):
         def preflight(executable):
             fake.events.append(("preflight", str(executable)))
             if preflight_error is not None:
                 raise preflight_error
             return SimpleNamespace(executable=OCR_EXECUTABLE)
 
-        argv = [str(SCRIPT), "--layout", "offline-layout",
-                "--tesseract-cmd", OCR_EXECUTABLE]
+        if not resume:
+            self.skip_list.unlink(missing_ok=True)
+        argv = [str(script), "--layout", "offline-layout",
+                "--tesseract-cmd", OCR_EXECUTABLE, "--run-list", str(self.run_list),
+                "--skip-list", str(self.skip_list)]
         if not use_default_calibration:
             argv.extend(['--transform-file', str(self.calibration)])
         with patch.dict(sys.modules, {"playwrightscriptlib": fake}), \
                 patch("time.sleep", new=fake.wait), \
                 patch.object(xy_readout, "TesseractReader", side_effect=preflight), \
                 patch.object(sys, "argv", argv):
-            return runpy.run_path(str(SCRIPT), run_name="__main__")
+            return runpy.run_path(str(script), run_name="__main__")
+
+    def recorded_positions(self):
+        lines = self.skip_list.read_text(encoding="utf-8").splitlines()
+        return [literal_eval(line.strip()) for line in lines
+                if line.strip() and not line.lstrip().startswith("#")]
+
+    def test_job_start_alone_leaves_disk_pending(self):
+        if not self.config["wetrun"]:
+            self.skipTest("Exposure disabled in operator configuration")
+        fake = FakePSL()
+        verify = fake.verifyFrame
+
+        def interrupt_before_confirm(name, **kwargs):
+            if name == "laser-confirm-image":
+                raise RuntimeError("Interrupted before exposure confirmation")
+            return verify(name, **kwargs)
+
+        with patch.object(fake, "verifyFrame", side_effect=interrupt_before_confirm):
+            with self.assertRaisesRegex(RuntimeError, "before exposure confirmation"):
+                self.run_script(fake)
+        self.assertIn(("click", "job-start"), fake.events)
+        self.assertNotIn(("click", "laser-confirm"), fake.events)
+        self.assertEqual(self.skip_list.read_text(encoding="utf-8"), "")
+
+    def test_resume_after_confirm_skips_disk_even_if_job_finish_check_failed(self):
+        if not self.config["wetrun"]:
+            self.skipTest("Exposure disabled in operator configuration")
+        self.skip_list.write_text("(0,1)\n", encoding="utf-8")
+        fake = FakePSL()
+        verify = fake.verifyFrame
+
+        def interrupt_after_confirm(name, **kwargs):
+            if name == "job-finished":
+                raise RuntimeError("Interrupted before exposure finished")
+            return verify(name, **kwargs)
+
+        with patch.object(fake, "verifyFrame", side_effect=interrupt_after_confirm):
+            with self.assertRaisesRegex(RuntimeError, "before exposure finished"):
+                self.run_script(fake, resume=True)
+        self.assertIn(("click", "laser-confirm"), fake.events)
+        self.assertEqual(self.recorded_positions(), [(0, 1), (5, 0)])
+
+        resumed = FakePSL()
+        self.run_script(resumed, resume=True)
+        self.assertEqual(resumed.moves, self.reference.moves[2:])
+        self.assertEqual(self.recorded_positions(), [(0, 1), (5, 0), (2, 4)])
+
+        done = FakePSL()
+        self.run_script(done, resume=True)
+        self.assertFalse(any(e[0] in {"connect", "click", "type"} for e in done.events))
+
+        self.skip_list.unlink()
+        new_batch = FakePSL()
+        self.run_script(new_batch, resume=True)
+        self.assertEqual(new_batch.moves, self.reference.moves)
+        self.assertEqual(self.recorded_positions(), self.positions)
+
+    def test_dry_run_performs_moves_without_recording_exposures(self):
+        # Use the same flag the operator would edit, in a temporary script.
+        text = SCRIPT.read_text(encoding="utf-8")
+        text, count = re.subn(r"(?m)^wetrun\s*=\s*(?:True|False)\b", "wetrun=False", text)
+        self.assertEqual(count, 1)
+        script = self.run_list.with_name("dry-run.py")
+        script.write_text(text, encoding="utf-8")
+        fake = FakePSL()
+        self.run_script(fake, script=script)
+        self.assertEqual(fake.moves, self.reference.moves)
+        self.assertNotIn(("click", "laser-confirm"), fake.events)
+        self.assertEqual(self.skip_list.read_text(encoding="utf-8"), "")
 
     def test_default_calibration_is_loaded_once_from_beside_script(self):
         # Redirect the read to our fixture, while checking the actual default path.
@@ -199,8 +282,8 @@ class RealDWLXYGateTests(unittest.TestCase):
             self.calibration, plate_transform.SimilarityTransform(0, 1, 13.3, -19.25, 1.25),
             spacing=spacing, calibration_points=[{'row': 0, 'col': 0}, {'row': 5, 'col': 5}])
         fake = FakePSL()
-        config = self.run_script(fake)
-        enabled = [(r, c) for r in range(6) for c in range(6) if (r, c) not in config['skiplist']]
+        self.run_script(fake)
+        enabled = self.positions
         self.assertEqual(len(fake.moves), len(enabled))
         move_indices = [i for i, event in enumerate(fake.events) if event == ('click', 'move-absolute')]
         previous_move = -1
@@ -348,6 +431,18 @@ class RealDWLXYGateTests(unittest.TestCase):
                 self.assertEqual(fake.events[-1], ("read", "zero", 0))
                 self.assertFalse(any(e[0] == "click" and e[1] in {"job-tab", "job-start", "laser-confirm"}
                                      for e in fake.events))
+
+    def test_adjusted_move_margin_applies_to_one_check(self):
+        self.require_cycles(2)
+        def offset(index, x, y):
+            return f"X={x + 501}, Y={y} µm"
+
+        fake = FakePSL(read_results=offset, margin_changes={("move", 0): 501})
+        with self.assertRaises(xy_readout.ReadoutError):
+            self.run_script(fake)
+        self.assertEqual(fake.moves, self.reference.moves[:2])
+        self.assertEqual(fake.events.count(("click", "focus-button")), 1)
+        self.assertEqual(fake.events[-1], ("read", "move", 1))
 
     def test_invalid_center_read_prevents_typing_movement_focus_and_exposure(self):
         self.require_cycles()

@@ -50,8 +50,19 @@ Verify the upper left corner of the Chrome debug instance looks like this:
 <img width="1952" height="806" alt="image" src="https://github.com/user-attachments/assets/3260af94-df18-40ca-9ffe-3445f67d7b2e" />
 
 
-Then run:
-`python real-dwl.py`
+The [run list](run-list.txt) sets the order of the disks. It ships with all
+36 positions, from `(0,0)` through `(5,5)`, one row at a time. The script
+records each disk in `skip-list.txt` when it sends the final exposure
+confirmation.
+
+- **To resume this batch**, keep `skip-list.txt` and run `python real-dwl.py`.
+  The script visits the remaining positions in run-list order.
+- **To start a new batch**, stop the script, delete `skip-list.txt`, and
+  run `python real-dwl.py`. The script creates an empty skip list.
+
+If you're continuing a batch begun with the old hardcoded skip list, enter
+the already-started disks in `skip-list.txt` before launching the updated
+script. See [batch tracking and recovery](install.md#batch-tracking-and-recovery).
 
 The script starts in single step mode so you have to click next for each step.
 
@@ -65,22 +76,14 @@ If things do not line up right, maybe someone resized the panels in C# Menu. You
 
 <img width="775" height="633" alt="image" src="https://github.com/user-attachments/assets/b28b622e-7e1a-4fc1-8a3e-c05eaad1223a" />
 
-Mapping and ordering with current tray:
-```
+For each pending `(r,c)` in the run list, the script calculates the stage target.
+Row 0 is closest to the machine door. Column 0 is on the left when facing the machine.
+
+```python
 spacing, plate_to_stage = load_plate_calibration("plate-calibration.json")
-
-# Row 0 is the line of disks closest to the machgine door
-# Col 0 is the row of disks closest to the left side of the machine when looking at it from the front
-
-for r in range(0, 6):
-
-    for c in range(0, 6):
-
-        psl.info(f"*** Starting cycle for row {r}, column {c} ***")
-
-        local_xy = plate_position(r, c, spacing)
-        stage_x, stage_y = plate_to_stage.apply(local_xy)
-        xpos, ypos = str(round(stage_x)), str(round(stage_y))
+local_xy = plate_position(r, c, spacing)
+stage_x, stage_y = plate_to_stage.apply(local_xy)
+xpos, ypos = str(round(stage_x)), str(round(stage_y))
 ```
 
 

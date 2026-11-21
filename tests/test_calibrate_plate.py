@@ -53,7 +53,7 @@ class FakeMachine:
     }
 
     def __init__(self, *, third_error=(12.3, -4.5), spacing=28489.0, scale=1.0,
-                 fail_verify=None, bad_reads=None, move_errors=None):
+                 fail_verify=None, bad_reads=None, move_errors=None, margin_changes=None):
         self.events = []
         self.moves = []
         self.messages = []
@@ -63,6 +63,8 @@ class FakeMachine:
         self.fail_verify = fail_verify
         self.bad_reads = bad_reads or {}
         self.move_errors = move_errors or {}
+        self.spacing = spacing
+        self.margin_changes = margin_changes or {}
         self.verify_counts = {}
         self.center_count = 0
         self.pending_point = None
@@ -139,12 +141,14 @@ class FakeMachine:
     def wait(self, seconds):
         self.events.append(("wait", seconds))
 
-    def grabOCRTextLine(self, name, *, tesseract_cmd, review=False, validator=None):
+    def grabOCRTextLine(self, name, *, tesseract_cmd, review, validator, retrycount, delay, margin):
         if name != "actual-xy" or not review or not callable(validator):
             raise AssertionError("Calibration readbacks must use reviewed, validated actual-xy OCR")
         if self.read_phase not in ("move", "center"):
             raise AssertionError("OCR requires a pending move or completed center find")
         phase = self.read_phase
+        if (retrycount, delay, margin) != (5, 5, 50 if phase == "move" else self.spacing / 2):
+            raise AssertionError("Unexpected retry settings or default margin for this calibration read")
         index = len(self.moves) - 1
         if phase == "move":
             delta = self.move_errors.get(index, (0, 0))
@@ -156,7 +160,7 @@ class FakeMachine:
         text = self.bad_reads.get((phase, index),
                                   f"X={position[0]:.6f}, Y={position[1]:.6f} um")
         self.events.append(("read", phase, index, text))
-        validator(text)
+        validator(text, self.margin_changes.get((phase, index), float(margin)))
         if phase == "move":
             self.move_read_ok = True
         self.read_phase = None
@@ -251,6 +255,20 @@ class CalibrationWorkflowTests(unittest.TestCase):
     def test_exact_move_tolerance_remains_inclusive(self):
         machine = FakeMachine(move_errors={0: (50, -50)})
         self.assertEqual(self.run_calibration(machine)["status"], "complete")
+
+    def test_adjusted_move_margin_preserves_fractional_displacement(self):
+        machine = FakeMachine(move_errors={0: (50.125, 0)}, margin_changes={("move", 0): 50.125})
+        report = self.run_calibration(machine)
+        first = report["measurements"][0]
+        self.assertEqual(first["move_readback_xy_um"][0] - first["commanded_xy_um"][0], 50.125)
+
+    def test_adjusted_center_margin_uses_strict_radial_distance(self):
+        machine = FakeMachine(margin_changes={("center", 0): 5})
+        x, y = map(round, nominal(0, 0))
+        machine.centers[0] = (x + 3, y + 4)
+        with self.assertRaisesRegex(ReadoutError, "radial distance must be less than 5"):
+            self.run_calibration(machine)
+        self.assertEqual(len(machine.moves), 1)
 
     def test_malformed_decimal_measurement_blocks_next_motion(self):
         machine = FakeMachine(bad_reads={("center", 0): "X=-71234 7, Y=71000.0 um"})

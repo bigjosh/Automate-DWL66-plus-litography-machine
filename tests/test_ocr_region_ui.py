@@ -28,7 +28,7 @@ class Widget:
         pass
 
     grid = rowconfigure = columnconfigure = lift = pack
-    xview = yview = set = pack
+    xview = yview = set = focus_set = selection_range = pack
 
     def configure(self, **options):
         self.options.update(options)
@@ -41,6 +41,9 @@ class Widget:
 
     def insert(self, position, text):
         self.contents += text
+
+    def get(self):
+        return self.contents
 
     def create_image(self, *coords, **options):
         self.items.append(options["image"])
@@ -67,7 +70,7 @@ class Harness:
         self.widgets, self.roots = [], []
         self.action = lambda root: root.destroy()
         self.tk = SimpleNamespace(TclError=FakeTclError)
-        for kind in ("Frame", "Label", "Text", "Canvas", "Scrollbar", "Button"):
+        for kind in ("Frame", "Label", "Text", "Canvas", "Scrollbar", "Button", "Entry"):
             setattr(self.tk, kind, self.factory(kind))
 
     def factory(self, kind):
@@ -176,6 +179,74 @@ class OCRRegionUITests(unittest.TestCase):
         self.photos.assert_not_called()
         text = next(w for w in self.h.widgets if w.kind == "Text")
         self.assertEqual(text.contents, "(No OCR text returned)")
+
+    def test_alarm_shows_failure_and_literal_text_and_closes_to_stop(self):
+        buttons = ("Retry", "Show OCR region", "Redefine OCR area", "Change margin", "STOP")
+        self.h.action = lambda root: root.protocols["WM_DELETE_WINDOW"]()
+        choice = layouts.ocr_dialog("actual-xy", self.crop, "X=890, Y=0", error="Expected (0, 0)",
+                                    alarm=True, buttons=buttons)
+        self.assertEqual(choice, buttons.index("STOP"))
+        self.assertIn("ALARM", self.h.roots[0].options["title"])
+        labels = [w.options["text"] for w in self.h.widgets if w.kind == "Label"]
+        self.assertTrue(any("ALARM" in label and "actual-xy" in label for label in labels))
+        self.assertIn("Expected (0, 0)", labels)
+        text = next(w for w in self.h.widgets if w.kind == "Text")
+        self.assertEqual(text.contents, repr("X=890, Y=0"))
+
+    def test_show_region_on_full_screenshot_maps_exclusive_bounds_at_any_scale(self):
+        source = Image.new("RGB", (2400, 1800), "white")
+        for box in ((1777, 1090, 1850, 1172), (2399, 1799, 2400, 1800)):
+            with self.subTest(box=box):
+                self.reset_dialog()
+                self.h.action = lambda root: self.h.click("Back to OCR check")
+                layouts.show_ocr_region("actual-xy", source, box)
+                marked = next(w.options["image"] for w in self.h.widgets if "image" in w.options)
+                self.assertLess(marked.width, source.width)
+                x1, y1, x2, y2 = box
+                left, top = x1 * marked.width // source.width, y1 * marked.height // source.height
+                right = (x2 * marked.width - 1) // source.width
+                bottom = (y2 * marked.height - 1) // source.height
+                self.assertEqual(marked.getpixel((left, top)), (255, 255, 0))
+                self.assertEqual(marked.getpixel((right, bottom)), (255, 255, 0))
+                self.assertEqual(marked.getpixel((left - 1, top)), (0, 0, 0))
+                self.assertEqual(marked.getpixel((0, 0)), (255, 255, 255))
+                self.assertTrue(self.h.roots[0].destroyed)
+        self.assertEqual(source.getextrema(), ((255, 255),) * 3)
+
+    def test_region_preview_rejects_boxes_outside_the_failed_capture(self):
+        for box in ((0, 0, 1401, 100), (3, 0, 3, 10), (-1, 1, 3, 9)):
+            with self.subTest(box=box), self.assertRaises(layouts.LayoutError):
+                layouts.show_ocr_region("actual-xy", self.crop, box)
+        self.roots.assert_not_called()
+
+    def test_margin_requires_finite_nonnegative_number_and_accepts_zero(self):
+        def edit(root):
+            entry = next(w for w in self.h.widgets if w.kind == "Entry")
+            self.assertEqual(entry.contents, "500")
+            for value in ("", "abc", "-1", "NaN", "Infinity", "1e9999"):
+                entry.contents = value
+                self.h.click("Apply margin")
+                self.assertFalse(root.destroyed)
+                self.assertTrue(any("finite number" in w.options.get("text", "") for w in self.h.widgets))
+            entry.contents = "0"
+            root.bindings["<Return>"](None)
+
+        self.h.action = edit
+        self.assertEqual(layouts.prompt_ocr_margin("actual-xy", 500), 0.0)
+
+    def test_fractional_margin_and_cancellation(self):
+        def edit(root):
+            next(w for w in self.h.widgets if w.kind == "Entry").contents = "25.75"
+            self.h.click("Apply margin")
+
+        self.h.action = edit
+        self.assertEqual(layouts.prompt_ocr_margin("actual-xy", 500), 25.75)
+        for cancel in (lambda root: self.h.click("Cancel"),
+                       lambda root: root.bindings["<Escape>"](None),
+                       lambda root: root.protocols["WM_DELETE_WINDOW"]()):
+            self.reset_dialog()
+            self.h.action = cancel
+            self.assertIsNone(layouts.prompt_ocr_margin("actual-xy", 500))
 
     def test_rendering_failure_closes_dialog_and_preserves_error(self):
         self.photos.side_effect = RuntimeError("image allocation failed")

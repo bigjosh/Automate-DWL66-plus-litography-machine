@@ -84,8 +84,9 @@ def parse_xy_integers(text: str) -> tuple[Decimal, Decimal]:
     return values["X"], values["Y"]
 
 
-def require_xy_position(text, expected_x, expected_y) -> tuple[Decimal, Decimal]:
-    """Check the integer X/Y readouts against the production position tolerance.
+def require_xy_position(text, expected_x, expected_y, *,
+                        tolerance=POSITION_TOLERANCE_UM) -> tuple[Decimal, Decimal]:
+    """Check the integer X/Y readouts against the given per-axis tolerance in µm.
 
     Any parse or position error raises ReadoutError, allowing the production
     script to stop before focusing. Commands must be finite integers. The
@@ -100,8 +101,13 @@ def require_xy_position(text, expected_x, expected_y) -> tuple[Decimal, Decimal]
            for target in (target_x, target_y)):
         raise ReadoutError("Expected X/Y positions must be finite integers.")
 
-    tolerance = POSITION_TOLERANCE_UM
-    values = (actual_x, actual_y, target_x, target_y, tolerance)
+    try:
+        tolerance = Decimal(str(tolerance))
+    except (InvalidOperation, ValueError) as exc:
+        raise ReadoutError("Position tolerance must be finite and nonnegative.") from exc
+    if not tolerance.is_finite() or tolerance < 0:
+        raise ReadoutError("Position tolerance must be finite and nonnegative.")
+    values = (actual_x, actual_y, target_x, target_y)
     # Keep subtraction exact even if a caller reduced the Decimal precision.
     highest_place = max(value.adjusted() for value in values)
     lowest_place = min(value.as_tuple().exponent for value in values)
