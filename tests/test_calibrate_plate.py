@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from plate_transform import SimilarityTransform
+from run_folders import create_run
 from xy_readout import ReadoutError
 
 
@@ -192,6 +193,8 @@ class CalibrationWorkflowTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.output_dir = Path(self.temp.name) / "calibration"
+        self.project = Path(self.temp.name)
+        self.enterContext(patch.object(self.tester, "PROJECT", self.project))
 
     def run_calibration(self, machine, **kwargs):
         return self.tester.run_calibration(
@@ -239,9 +242,32 @@ class CalibrationWorkflowTests(unittest.TestCase):
                                        "--transform-file", str(active), "--output-dir", str(self.output_dir)])
         self.assertEqual(calibrate.call_args.kwargs["disks"], ((4, 4), (0, 0), (1, 4)))
         self.assertEqual(result, 7)
-        stats.assert_called_once_with([sys.executable, str(SCRIPT.with_name("calibrate-stats.py")), str(active)])
+        stats.assert_called_once_with([sys.executable, str(self.project / "calibrate-stats.py"), str(active)])
         machine.disconnect.assert_called_once()
         self.assertEqual(skip.read_bytes(), b"(1,4)\n(4,4)\n")
+
+    def test_latest_calibration_uses_run_state_and_nested_report_with_alternate_survey(self):
+        (self.project / "run-list.txt").write_text("(1,1)\n", encoding="utf-8")
+        old = create_run(self.project)
+        active = create_run(self.project)
+        survey = self.project / "mounted-disks.txt"
+        survey.write_text("(0,0)\n(0,5)\n(5,5)\n", encoding="utf-8")
+        browser = Mock()
+        with (patch.dict(sys.modules, {"playwrightscriptlib": browser}),
+              patch.object(self.tester, "TesseractReader"),
+              patch.object(self.tester, "run_calibration") as measure,
+              patch.object(self.tester.subprocess, "run") as stats):
+            stats.return_value.returncode = 0
+            self.assertEqual(self.tester.main(["--latest-run", "--run-list", str(survey)]), 0)
+        options = measure.call_args.kwargs
+        self.assertEqual(options["disks"], DISKS)
+        self.assertEqual(options["transform_file"], active / "plate-calibration.json")
+        self.assertEqual(options["output_dir"].parent, active)
+        browser.setRunFolder.assert_called_once_with(options["output_dir"])
+        stats.assert_called_once_with([sys.executable, str(self.project / "calibrate-stats.py"),
+                                       str(active / "plate-calibration.json")])
+        self.assertFalse((old / "plate-calibration.json").exists())
+        self.assertEqual((active / "skip-list.txt").read_bytes(), b"")
 
     def test_held_out_error_uses_radial_limit_and_failed_recalibration_retires_old_file(self):
         machine = FakeMachine(third_error=(400, 400))
@@ -274,6 +300,8 @@ class CalibrationWorkflowTests(unittest.TestCase):
                 self.assertFalse(machine.events)
         with self.assertRaisesRegex(ValueError, "Run and skip lists"):
             self.tester.main(["--run-list", str(self.output_dir / "run.log"),
+                              "--skip-list", str(self.project / "skip.txt"),
+                              "--transform-file", str(self.project / "custom.json"),
                               "--output-dir", str(self.output_dir)])
         self.assertFalse(self.output_dir.exists())
 

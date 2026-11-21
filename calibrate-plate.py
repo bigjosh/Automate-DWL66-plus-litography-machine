@@ -21,6 +21,7 @@ from dwl_actions import (check_frame, configure_machine_screen, focus, optical_c
                          raise_head, read_xy, restore_stage_frame, send_absolute_move)
 from plate_transform import (VALIDATION_TOLERANCE_UM, fit_similarity_transform, load_plate_calibration,
                              load_validated_plate_calibration, plate_position, save_calibration)
+from run_folders import add_run_arguments, run_session
 from xy_readout import TesseractReader
 
 
@@ -240,24 +241,25 @@ def main(argv=None):
     parser.add_argument("--spacing", type=positive_spacing, default=28489.0,
                         help="Plate grid spacing in um (default: 28489)")
     parser.add_argument("--output-dir", type=Path, help="New folder for results and screenshots")
-    parser.add_argument("--run-list", type=Path, default=PROJECT / "run-list.txt",
-                        help="Select three disks from this ordered run list")
-    parser.add_argument("--skip-list", type=Path, default=PROJECT / "skip-list.txt",
-                        help="Use the production skip list to lock this batch during calibration")
-    parser.add_argument("--transform-file", type=Path,
-                        default=PROJECT / "plate-calibration.json",
-                        help="Reusable transform JSON (default: plate-calibration.json beside script)")
+    add_run_arguments(parser)
     args = parser.parse_args(argv)
-    output_dir = (args.output_dir or PROJECT / "runs" /
+    with run_session(PROJECT, args, calibration=True) as run_dir:
+        return calibrate(args, run_dir)
+
+
+def calibrate(args, run_dir):
+    report_parent = run_dir if run_dir is not None else PROJECT / "runs"
+    output_dir = (args.output_dir or report_parent /
                   ("plate-calibration-" + datetime.now().strftime("%Y%m%d-%H%M%S-%f"))).resolve()
     transform_file = args.transform_file.resolve()
     check_output_paths(output_dir, transform_file, batch_files=(args.run_list, args.skip_list))
-    with BatchState(args.run_list, args.skip_list) as batch:
+    with BatchState(args.run_list, args.skip_list, create_skip=run_dir is None) as batch:
         disks = select_disks(batch.positions)
         reader = TesseractReader(args.tesseract_cmd)
         import playwrightscriptlib as psl
 
         output_dir.mkdir(parents=True, exist_ok=True)
+        psl.setRunFolder(output_dir)
         psl.logging(True, str(output_dir / "run.log"))
         psl.screenshotOnInfo(True, str(output_dir / "screenshots"))
         psl.alarmOnError()

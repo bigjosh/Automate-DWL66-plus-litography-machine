@@ -53,29 +53,26 @@ Verify the upper left corner of the Chrome debug instance looks like this:
 <img width="1952" height="806" alt="image" src="https://github.com/user-attachments/assets/3260af94-df18-40ca-9ffe-3445f67d7b2e" />
 
 
-The [run list](run-list.txt) sets the order of the disks. It ships with all
-36 positions, from `(0,0)` through `(5,5)`, one row at a time. The script
-records each disk in `skip-list.txt` when it sends the final exposure
-confirmation.
-
 For a newly loaded carrier, stop the previous run and use these commands in order
 from the repository folder.
 
-1. `.\new-batch.bat` clears the previous exposure record and calibration.
+1. `.\new-run.bat` creates a folder named `runs\YYMMDD HHMMSS`. It copies the
+   [run-list template](run-list.txt) and starts an empty `skip-list.txt` for
+   this carrier. The template includes all 36 disks in row order. To change the
+   order or subset for this carrier, edit the copy in the new folder.
 2. `.\calibrate.bat` optically centers three disks without exposing them. It
    fits the two farthest-apart centers and checks a third disk independently.
    A radial error of **500 µm or less** passes. A successful calibration saves
-   `plate-calibration.json` and prints pitch, stage offsets, rotation and check error.
-3. `.\run.bat` exposes the pending disks in run-list order using that calibration.
+   `plate-calibration.json` in the run folder and prints pitch, stage offsets,
+   rotation and check error.
+3. `.\run.bat` opens the folder with the latest `YYMMDD HHMMSS` timestamp
+   directly under `runs\`. It exposes the pending disks in that run's list
+   order and records each exposure start in that run's skip list.
 
-To resume on the same seated carrier with a validated calibration, use
-`.\run.bat`. If you have a calibration from the earlier two-disk workflow,
-run `.\calibrate.bat` once and keep the existing exposure record.
-[Calibration and disk selection](install.md#calibrate-the-carrier)
-
-If you're continuing a batch begun with the old hardcoded skip list, enter
-the already-started disks in `skip-list.txt` before launching the updated
-script. See [batch tracking and recovery](install.md#batch-tracking-and-recovery).
+**To resume the same seated carrier**, run `.\run.bat` again. Creating another
+run starts a fresh exposure record. If the carrier was partially exposed
+before this folder workflow was introduced, use the
+[existing-carrier recovery instructions](install.md#batch-tracking-and-recovery).
 
 The script starts in single step mode so you have to click next for each step.
 
@@ -93,7 +90,12 @@ For each pending `(r,c)` in the run list, the script calculates the stage target
 Row 0 is closest to the machine door. Column 0 is on the left when facing the machine.
 
 ```python
-spacing, plate_to_stage = load_validated_plate_calibration("plate-calibration.json")
+from pathlib import Path
+from plate_transform import load_validated_plate_calibration, plate_position
+from run_folders import latest_run
+
+run_folder = latest_run(Path.cwd())  # From the DWL repository folder
+spacing, plate_to_stage = load_validated_plate_calibration(run_folder / "plate-calibration.json")
 local_xy = plate_position(r, c, spacing)
 stage_x, stage_y = plate_to_stage.apply(local_xy)
 xpos, ypos = str(round(stage_x)), str(round(stage_y))

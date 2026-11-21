@@ -5,18 +5,20 @@ from pathlib import Path
 import sys
 
 from plate_transform import VALIDATION_TOLERANCE_UM, read_validated_calibration
+from run_folders import latest_run
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("file", nargs="?", type=Path,
-                        default=Path(__file__).resolve().with_name("plate-calibration.json"),
-                        help="Calibration JSON (default: plate-calibration.json beside this script)")
+                        help="Calibration JSON (defaults to the latest run's plate-calibration.json)")
     path = parser.parse_args(argv).file
     try:
+        if path is None:
+            path = latest_run(Path(__file__).resolve().parent) / "plate-calibration.json"
         document, transform = read_validated_calibration(path)
-    except (OSError, ValueError) as exc:
-        print(f"Cannot summarize calibration {path}: {exc}", file=sys.stderr)
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"Cannot summarize calibration: {exc}", file=sys.stderr)
         return 1
 
     spacing = document["spacing_um"]

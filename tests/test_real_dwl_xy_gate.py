@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 import xy_readout
 import plate_transform
+from run_folders import create_run
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "real-dwl.py"
@@ -52,8 +53,11 @@ class FakePSL(ModuleType):
     def logging(self, enabled):
         pass
 
-    def screenshotOnInfo(self, enabled):
-        pass
+    def setRunFolder(self, path):
+        self.output = Path(path)
+
+    def screenshotOnInfo(self, enabled, folder=None):
+        self.screenshots = Path(folder)
 
     def alarmOnError(self):
         pass
@@ -170,6 +174,8 @@ class RealDWLXYGateTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.calibration = Path(temporary.name) / 'plate-calibration.json'
+        self.script = self.calibration.with_name(SCRIPT.name)
+        self.script.write_bytes(SCRIPT.read_bytes())
         self.run_list = self.calibration.with_name("run-list.txt")
         self.skip_list = self.calibration.with_name("skip-list.txt")
         self.positions = [(5, 0), (0, 1), (2, 4)]
@@ -191,20 +197,22 @@ class RealDWLXYGateTests(unittest.TestCase):
             validation=dict(row=0, col=5, expected_xy_um=check_xy, measured_xy_um=check_xy,
                             error_distance_um=0.0, passed=True))
 
-    def run_script(self, fake, *, preflight_error=None, use_default_calibration=False,
-                   resume=False, script=SCRIPT):
+    def run_script(self, fake, *, preflight_error=None, managed=False, extra_args=(),
+                   resume=False, script=None):
         def preflight(executable):
             fake.events.append(("preflight", str(executable)))
             if preflight_error is not None:
                 raise preflight_error
             return SimpleNamespace(executable=OCR_EXECUTABLE)
 
-        if not resume:
+        if not resume and not managed:
             self.skip_list.unlink(missing_ok=True)
-        argv = [str(script), "--tesseract-cmd", OCR_EXECUTABLE, "--run-list", str(self.run_list),
-                "--skip-list", str(self.skip_list)]
-        if not use_default_calibration:
-            argv.extend(['--transform-file', str(self.calibration)])
+        script = script or self.script
+        argv = [str(script), "--tesseract-cmd", OCR_EXECUTABLE]
+        if not managed:
+            argv.extend(["--run-list", str(self.run_list), "--skip-list", str(self.skip_list),
+                         "--transform-file", str(self.calibration)])
+        argv.extend(extra_args)
         with patch.dict(sys.modules, {"playwrightscriptlib": fake}), \
                 patch("time.sleep", new=fake.wait), \
                 patch.object(xy_readout, "TesseractReader", side_effect=preflight), \
@@ -326,13 +334,53 @@ class RealDWLXYGateTests(unittest.TestCase):
         layouts = [event[1] for event in fake.events if event[0] == "layout"]
         self.assertEqual(layouts, [SCRIPT.with_name("layout")])
 
-    def test_default_calibration_is_loaded_once_from_beside_script(self):
-        script = self.calibration.with_name(SCRIPT.name)
-        script.write_bytes(SCRIPT.read_bytes())
+    def test_default_and_launcher_resume_latest_carrier_from_another_directory(self):
+        project = self.script.parent
+        old = create_run(project)
+        active = create_run(project)
+        calibration = active / "plate-calibration.json"
+        calibration.write_bytes(self.calibration.read_bytes())
+        (active / "skip-list.txt").write_text("(5,0)\n", encoding="utf-8")
+        fake = FakePSL()
         with patch.object(plate_transform, 'load_validated_plate_calibration',
-                          wraps=plate_transform.load_validated_plate_calibration) as load:
-            self.run_script(FakePSL(), script=script, use_default_calibration=True)
-        load.assert_called_once_with(self.calibration)
+                          wraps=plate_transform.load_validated_plate_calibration) as load, chdir(old):
+            self.run_script(fake, managed=True)
+            self.assertEqual(len(fake.moves), 2)
+            self.assertEqual(fake.output, active)
+            self.assertEqual(fake.screenshots, active / "screenshots")
+            resumed = FakePSL()
+            self.run_script(resumed, managed=True, extra_args=["--latest-run"])
+            self.assertFalse(resumed.moves)
+        load.assert_called_once_with(calibration)
+        self.assertEqual((old / "skip-list.txt").read_bytes(), b"")
+        self.assertEqual((active / "skip-list.txt").read_text().splitlines(), ["(5,0)", "(0,1)", "(2,4)"])
+
+    def test_launcher_cannot_use_other_carriers_calibration_or_progress(self):
+        old = create_run(self.script.parent)
+        create_run(self.script.parent)
+        for flag, name in [("--transform-file", "plate-calibration.json"), ("--skip-list", "skip-list.txt"),
+                           ("--run-list", "run-list.txt")]:
+            with self.subTest(flag=flag):
+                fake = FakePSL()
+                with self.assertRaisesRegex(ValueError, flag):
+                    self.run_script(fake, managed=True, extra_args=["--latest-run", flag, str(old / name)])
+                self.assertFalse(fake.events)
+
+    def test_default_without_managed_run_stops_before_machine_or_logs(self):
+        fake = FakePSL()
+        with self.assertRaisesRegex(FileNotFoundError, "new-run.bat"):
+            self.run_script(fake, managed=True)
+        self.assertFalse(fake.events)
+
+    def test_progress_removed_after_selection_is_never_recreated(self):
+        run = create_run(self.script.parent)
+        fake = FakePSL()
+        ledger = run / "skip-list.txt"
+        with patch.object(fake, "setRunFolder", side_effect=lambda folder: ledger.unlink()):
+            with self.assertRaises(FileNotFoundError):
+                self.run_script(fake, managed=True)
+        self.assertFalse(ledger.exists())
+        self.assertFalse(fake.moves)
 
     def test_calibrated_moves_log_local_and_stage_targets_and_verify_stage_readback(self):
         # A 90-degree rotation, non-unit scale, fractional offset and odd pitch

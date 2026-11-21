@@ -10,6 +10,7 @@ import tempfile
 import unittest
 
 from plate_transform import SimilarityTransform, plate_position, save_calibration
+from run_folders import create_run
 
 
 PROJECT = Path(__file__).resolve().parents[1]
@@ -19,12 +20,14 @@ class CalibrationStatsTests(unittest.TestCase):
     def setUp(self):
         folder = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.script = folder / "calibrate-stats.py"
-        self.module = folder / "plate_transform.py"
-        shutil.copyfile(PROJECT / self.script.name, self.script)
-        shutil.copyfile(PROJECT / self.module.name, self.module)
+        for name in [self.script.name, "plate_transform.py", "run_folders.py", "batch_state.py"]:
+            shutil.copyfile(PROJECT / name, folder / name)
+        (folder / "run-list.txt").write_text("(0,0)\n", encoding="utf-8")
+        old = create_run(folder)
+        self.write_calibration(old / "plate-calibration.json")
         self.cwd = folder / "different working folder"
         self.cwd.mkdir()
-        self.default = folder / "plate-calibration.json"
+        self.default = create_run(folder) / "plate-calibration.json"
 
     def stats(self, *args):
         return subprocess.run([sys.executable, "-B", str(self.script), *map(str, args)],
@@ -45,10 +48,12 @@ class CalibrationStatsTests(unittest.TestCase):
         save_calibration(path, transform, spacing=spacing, calibration_points=anchors,
                          validation=validation)
 
-    def test_reads_default_sibling_file_and_reports_measured_geometry(self):
+    def test_reads_latest_file_and_reports_measured_geometry(self):
+        self.assertNotEqual(self.stats().returncode, 0)
         self.write_calibration(self.default)
         result = self.stats()
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(str(self.default), result.stdout)
         for expected in ("28.350000 mm", "28.000000 mm", "1.012500000", "+220.400 um",
                          "-350.123 um", "-90.000000 deg", "(0,5)", "5.000 um (limit 500 um)"):
             self.assertIn(expected, result.stdout)
@@ -91,4 +96,5 @@ class CalibrateLauncherTests(unittest.TestCase):
                                         env=env, cwd=root, capture_output=True, text=True,
                                         stdin=subprocess.DEVNULL, timeout=15)
                 self.assertEqual(result.returncode, status, result.stderr)
-                self.assertEqual(json.loads(result.stdout), [str(project / "calibrate-plate.py"), *args])
+                self.assertEqual(json.loads(result.stdout), [str(project / "calibrate-plate.py"),
+                                                            "--latest-run", *args])

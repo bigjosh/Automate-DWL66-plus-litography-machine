@@ -262,7 +262,7 @@ run. Retrying the OCR does not repeat a move, focus, or exposure.
 
 ## Start the production script
 
-For a newly loaded carrier, stop the previous run, execute `.\new-batch.bat`
+For a newly loaded carrier, stop the previous run, execute `.\new-run.bat`
 from the DWL repository folder, then run `.\calibrate.bat`. After it passes,
 start production with the command below. When resuming the same seated carrier
 with a validated calibration, go directly to this command.
@@ -271,9 +271,9 @@ with a validated calibration, go directly to this command.
 .\run.bat
 ```
 
-At startup the script uses `plate-calibration.json` beside `real-dwl.py`, or
-the file specified by `--transform-file`. Before connecting to write a pending
-disk, it requires a passing independent third-disk check. Each move logs the
+At startup the script opens the newest carrier run and reads its
+`plate-calibration.json`. Before connecting to write a pending disk, it
+requires a passing independent third-disk check. Each move logs the
 local and stage targets in µm and rounds the stage coordinates to whole µm
 for Move absolute and its OCR check.
 
@@ -286,8 +286,9 @@ If Tesseract is installed in a different location, specify its path with
 
 The script starts in single-step mode. Advance with the operator controls or
 select continuous operation when ready. Skipping or aborting a required frame
-check stops the run. Logs and screenshots are saved under
-`runs\<timestamp>`. The script checks the X/Y integer readouts within ±500 µm
+check stops the run. Each invocation appends to `real-dwl.log` in the selected
+run folder and saves its screen captures under `screenshots\`.
+The script checks the X/Y integer readouts within ±500 µm
 on each axis after CENTER and after the move. For a calibrated disk it focuses
 once, waits for the executing and ready indicators, clicks **Set zero**, and
 checks that Actual X/Y are within the same tolerance of (0,0) before opening
@@ -300,26 +301,43 @@ operations; a persistent popup prevents the pending input and raises an error.
 
 ### Batch tracking and recovery
 
-The default [run-list.txt](run-list.txt) and local `skip-list.txt` live beside
-`real-dwl.py`. Each position is written on its own line as `(row,col)`. The
-run list ships with all 36 disks in row order. Edit it while the script is
-stopped to change the order or select a subset. Use `--run-list` and
-`--skip-list` to supply alternative file paths.
+**For a newly loaded carrier**, run `.\new-run.bat` once. It creates
+`runs\YYMMDD HHMMSS\` and prints the folder path. Each folder keeps its own
+run list, exposure record, and calibration for that carrier placement.
 
-For a **new batch**, stop the previous run and execute `.\new-batch.bat`.
-It deletes `skip-list.txt` and `plate-calibration.json` beside the batch
-file. Calibrate the newly seated carrier with `.\calibrate.bat`, then start
-exposures with `.\run.bat`.
+| File in the run folder | How it is used |
+| --- | --- |
+| `run-list.txt` | Snapshot of the [repository template](run-list.txt). Each `(row,col)` occupies one line, in exposure order. Edit the snapshot while the run is stopped to change this carrier's order or subset. Edit the template for future runs. |
+| `skip-list.txt` | Starts empty. Production records each disk here when it sends the final exposure confirmation. |
+| `plate-calibration.json` | Created by a successful `.\calibrate.bat` for this placement. |
 
-If you override `--skip-list` or `--transform-file`, select fresh paths for
-the new batch or clear the corresponding files before launch. The reset
-command uses the default filenames.
+**To resume the same seated carrier**, run `.\run.bat` again. It selects the
+latest `YYMMDD HHMMSS` folder directly under `runs\` by the timestamp in its
+name. Editing an older folder's contents or a nested calibration report cannot
+change that selection. Folders with other name formats are ignored.
 
-To **resume the same seated carrier**, keep the batch files and run the
-previous production command again. The script skips every listed position.
-The earlier hardcoded list omitted row 0. If you are finishing an existing tray, copy any
-already-started disks and any positions you still intend to skip into the
-skip list before the first launch.
+A timestamped folder from the older logging workflow also qualifies. If the
+latest folder contains only screenshots or logs, startup stops at that folder.
+The program never searches older folders for a usable calibration or skip list.
+Use `.\new-run.bat` for a newly loaded carrier. For a partially written carrier,
+recover its exposure record or follow the instructions below. For a current
+run awaiting calibration, use `.\calibrate.bat`.
+
+**When upgrading mid-carrier**, keep using the existing run list, skip list
+and verified calibration together. To resume a carrier whose three files
+already live beside `real-dwl.py`, run this command from the repository
+folder. It uses the existing exposure record. Creating a fresh run for this
+carrier would start with an empty skip list and could expose disks twice.
+
+```powershell
+.\.venv\Scripts\python.exe real-dwl.py --run-list ".\run-list.txt" --skip-list ".\skip-list.txt" --transform-file ".\plate-calibration.json"
+```
+
+If that seated carrier has an older two-disk calibration, first run
+`calibrate-plate.py` directly with the same three file arguments. A successful
+third-disk check makes the replacement calibration eligible for production.
+For a carrier started with the old hardcoded skip list, enter all previously
+started disks and intentional skips in its skip list before resuming.
 
 **Job Start** opens the laser confirmation. The final confirmation starts
 writing, and the script records that disk immediately afterward, before it
@@ -370,12 +388,14 @@ On success, `plate-calibration.json` contains the two fit measurements, the
 transform, and the independent measurement and error. The launcher then prints
 the nominal and measured pitch, stage X/Y offsets, rotation in degrees, scale
 and third-disk result. To print the saved statistics again without connecting
-to the machine, run `python calibrate-stats.py`.
+to the machine, run `python calibrate-stats.py`. It reads the newest run's
+calibration by default. Supply the path to a saved calibration file to inspect
+an older run.
 
 If the exposure run list contains fewer than three disks or lies on one line,
 supply a separate list of mounted disks with `.\calibrate.bat --run-list "path\to\calibration-list.txt"`.
-Use the same skip-list path for calibration and exposure so both commands share
-the batch lock.
+This changes the disks used for calibration. The resulting transform still
+belongs to the newest run.
 
 For any nominal plate center `(x, y)` in micrometers, the saved mapping is
 `machine_xy = scale * rotation_matrix * [x, y] + translation_um`.
@@ -384,13 +404,14 @@ In Python, `spacing, transform = load_validated_plate_calibration(path)`
 loads the validated mapping. Use `transform.apply(plate_position(row, col, spacing))`
 for a disk's stage center. Only the final machine command is rounded.
 
-Use `--transform-file "path\plate-calibration.json"` to choose another shared
-file, `--spacing` for another pitch in um, or `--tesseract-cmd` if needed.
-When remeasuring a seated carrier, keep its skip list. Calibration archives
-the previous active transform in the run folder before measuring a replacement.
-Detailed results, raw OCR strings, log, and screenshots are
-saved under `runs\plate-calibration-<timestamp>`. Results are saved after
-each center find; `--output-dir` selects a different run folder.
+Use `--spacing` for another nominal pitch in µm or `--tesseract-cmd` for a
+different OCR executable. Each calibration attempt creates a
+`plate-calibration-<timestamp>` subfolder inside the selected run for its
+report, raw OCR strings, log, and screenshots. When remeasuring a seated
+carrier, calibration archives the previous active transform in that attempt's
+folder. It saves results after each center find and publishes a passing
+`plate-calibration.json` in the selected run. Use `--output-dir` to choose a
+different directory for the calibration report and diagnostics.
 
 Calibration reads preserve decimal fractions and use the strict whole-line
 parser. Before each focus, the default allowed error is ±50 µm on each axis.

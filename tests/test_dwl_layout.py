@@ -30,6 +30,7 @@ class StandaloneLayoutTests(unittest.TestCase):
                     browser.loadLayout.side_effect = SystemExit("layout reached")
                     argv = [str(script), "--output-dir", folder]
                     if filename == "calibrate-plate.py":
+                        program.PROJECT = Path(folder)  # Keep its machine lock in the fixture.
                         run_list = Path(folder) / "run-list.txt"
                         run_list.write_text("(0,0)\n(5,5)\n(0,5)\n", encoding="utf-8")
                         argv += ["--run-list", str(run_list), "--skip-list", str(run_list.with_name("skip.txt")),

@@ -10,7 +10,7 @@ _POSITION = re.compile(r"\(\s*([0-5])\s*,\s*([0-5])\s*\)")
 _PENDING = "# pending exposure "
 
 
-def _read_positions(path, data, *, check_pending=False):
+def read_positions(path, data, *, check_pending=False):
     positions = []
     for number, line in enumerate(data.decode("utf-8-sig").splitlines(), 1):
         line = line.strip()
@@ -35,7 +35,7 @@ def _read_positions(path, data, *, check_pending=False):
     return positions
 
 
-def _lock_skip_list(stream, path):
+def lock_batch_file(stream, path):
     try:
         if os.name == "nt":
             import msvcrt
@@ -54,21 +54,25 @@ def _lock_skip_list(stream, path):
 class BatchState:
     """Hold the skip-list lock from startup through the end of the machine run."""
 
-    def __init__(self, run_path, skip_path):
+    def __init__(self, run_path, skip_path, *, create_skip=True):
         self.run_path = Path(run_path)
         self.skip_path = Path(skip_path)
+        self.create_skip = create_skip
         self._stream = None
 
     def __enter__(self):
-        self.positions = tuple(_read_positions(self.run_path, self.run_path.read_bytes()))
+        self.positions = tuple(read_positions(self.run_path, self.run_path.read_bytes()))
         if self.skip_path.exists() and self.run_path.samefile(self.skip_path):
             raise ValueError("The run list and skip list must be different files.")
-        fd = os.open(self.skip_path, os.O_RDWR | os.O_CREAT | getattr(os, "O_BINARY", 0), 0o666)
+        flags = os.O_RDWR | getattr(os, "O_BINARY", 0)
+        if self.create_skip:
+            flags |= os.O_CREAT
+        fd = os.open(self.skip_path, flags, 0o666)
         stream = os.fdopen(fd, "r+b")
         try:
-            _lock_skip_list(stream, self.skip_path)
+            lock_batch_file(stream, self.skip_path)
             self._expected = stream.read()
-            skipped = _read_positions(self.skip_path, self._expected, check_pending=True)
+            skipped = read_positions(self.skip_path, self._expected, check_pending=True)
             self.skipped = set(skipped)
             self.pending = tuple(position for position in self.positions if position not in self.skipped)
             self._remaining = set(self.pending)

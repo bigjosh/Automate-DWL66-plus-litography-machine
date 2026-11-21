@@ -71,6 +71,7 @@ _clicks_settle_time = 0.0
 _shot_dir = None
 _shot_warned = False
 _run_dir = None
+_configured_run_dir = None
 _layout = None
 _click_guard = None
 
@@ -83,6 +84,21 @@ class ClickGuardTimeout(ClickGuardError):
     """A popup prevented confirming a clear screen within the time limit."""
 
 
+def setRunFolder(folder):
+    """Choose where subsequent logs, screenshots and diagnostics will be created.
+
+    Call before logging() and screenshotOnInfo(). A relative folder is resolved
+    against the current directory. Pass None to restore automatic folder selection.
+    """
+    global _configured_run_dir
+    if folder is None:
+        _configured_run_dir = None
+        return
+    path = os.path.abspath(folder)
+    os.makedirs(path, exist_ok=True)
+    _configured_run_dir = path
+
+
 def _run_folder():
     """runs\\<yymmdd hhmmss>\\ next to the running script.
 
@@ -90,6 +106,8 @@ def _run_folder():
     log file and the info screenshots of one run land in one folder.
     """
     global _run_dir
+    if _configured_run_dir is not None:
+        return _configured_run_dir
     if _run_dir is None:
         base = sys.argv[0] if sys.argv and sys.argv[0] else "."
         _run_dir = os.path.join(os.path.dirname(os.path.abspath(base)),
@@ -1384,12 +1402,14 @@ def _diff_viewer(expected, actual, score, matchLevel, box=None, full=None,
 def _save_diff_files(expected, actual, full=None, box=None):
     """Headless fallback for the diff viewer: write expected/actual/highlight
     (and, when available, full-frame context with the compare region boxed
-    in red) PNGs to the current directory and return their absolute paths."""
+    in red) PNGs to the configured run folder, defaulting to the current directory."""
     actual = actual.convert("RGB")
     if actual.size != expected.size:
         actual = actual.resize(expected.size, Image.LANCZOS)
     mask = _diff_mask(expected, actual)
     stamp = time.strftime("%Y%m%d-%H%M%S")
+    if _configured_run_dir is not None:
+        stamp += "-%d" % time.time_ns()
     images = [("expected", expected), ("actual", actual),
               ("highlight", _highlight(actual, mask))]
     if full is not None and box is not None:
@@ -1398,7 +1418,8 @@ def _save_diff_files(expected, actual, full=None, box=None):
         images.append(("context", context))
     paths = []
     for label, im in images:
-        path = os.path.abspath("compare-diff-%s-%s.png" % (stamp, label))
+        filename = "compare-diff-%s-%s.png" % (stamp, label)
+        path = os.path.abspath(os.path.join(_configured_run_dir or ".", filename))
         im.save(path)
         paths.append(path)
     return paths

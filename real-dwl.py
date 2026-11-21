@@ -1,6 +1,7 @@
 """Expose pending disks using the carrier's independently verified stage calibration."""
 
 import argparse
+from datetime import datetime
 from pathlib import Path
 import time
 
@@ -11,6 +12,7 @@ from dwl_actions import (
     focus, raise_head, restore_stage_frame, send_absolute_move,
 )
 from plate_transform import load_validated_plate_calibration, plate_position
+from run_folders import add_run_arguments, run_session
 from xy_readout import TesseractReader
 
 
@@ -19,15 +21,9 @@ wetrun = True
 
 
 def parse_args():
-    folder = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description="Run the DWL step-and-expose sequence.")
     parser.add_argument("url", nargs="?", default="http://127.0.0.1:9222")
-    parser.add_argument("--run-list", type=Path, default=folder / "run-list.txt",
-                        help="Ordered disk positions (default: run-list.txt beside this script)")
-    parser.add_argument("--skip-list", type=Path, default=folder / "skip-list.txt",
-                        help="Batch exposure record (default: skip-list.txt beside this script)")
-    parser.add_argument("--transform-file", type=Path, default=folder / "plate-calibration.json",
-                        help="Verified plate calibration produced by calibrate.bat")
+    add_run_arguments(parser)
     parser.add_argument("--tesseract-cmd", help="Path to tesseract.exe if needed")
     parser.add_argument("--crd-popup-screenshot", type=Path,
                         help="Define the CRD popup reference from a saved full-viewport screenshot")
@@ -107,12 +103,16 @@ def run_batch(args, batch):
 
 def main():
     args = parse_args()
-    psl.logging(True)
-    psl.screenshotOnInfo(True)
-    psl.alarmOnError()
-    with BatchState(args.run_list, args.skip_list) as batch:
-        run_batch(args, batch)
-    psl.info("Script finished")
+    project = Path(__file__).resolve().parent
+    with run_session(project, args) as run_dir:
+        output = run_dir or project / "runs" / "legacy" / datetime.now().strftime("%y%m%d %H%M%S-%f")
+        psl.setRunFolder(output)
+        psl.logging(True)
+        psl.screenshotOnInfo(True, str(output / "screenshots"))
+        psl.alarmOnError()
+        with BatchState(args.run_list, args.skip_list, create_skip=run_dir is None) as batch:
+            run_batch(args, batch)
+        psl.info("Script finished")
 
 
 if __name__ == "__main__":

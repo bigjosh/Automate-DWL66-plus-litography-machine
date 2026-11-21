@@ -247,6 +247,9 @@ def main():
     ui = CaptureUI()
     connected = False
     try:
+        # Top-level timestamp folders in runs/ identify carriers.
+        diagnostics = Path(__file__).resolve().parent / "runs" / "capture-xy" / time.strftime("%y%m%d %H%M%S")
+        psl.setRunFolder(diagnostics)
         psl.logging(True)
         psl.connect(args.url, page_hint="remotedesktop.google.com")
         connected = True
