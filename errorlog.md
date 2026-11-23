@@ -1,3 +1,34 @@
+# 2026-11-21 (0,1)
+
+First write with nerw calibnration system got.
+
+"has activated dies outside of substrate bounds" error on starting exposure. :/
+
+Switching back to writing after each of the two calibration center find to see if that is what it wants. :(
+ 
+ (1,5) 
+
+ DigitalAFCard >> Exception while movement
+ Did Test Stage
+
+ (0,1)
+
+ DigitalAFCard >> Exception while movement
+ Restarted C# menu
+ 
+ (0,3) 
+
+ The screen went grey for a second after clicking on the global alignment tab, then came back but the click did not register so it couldnt find the x/y fields. 
+
+ (2,4) 
+
+ The C3 menu window went grey ("Not responding") when we clicked on the JOB tab and the click never made it so we stayed on the move screen and never detected the Start button. This 
+ grey thing is new since the windows upgrade (never saw on oild version) and very promlematic since it happens AFTER our interaction and sometiomes consumes our input and
+ sometimes not. :/
+
+Next I'll test turning off Real time virus detect and also closing chrome and everything else except C# menu.
+
+
 # 2026-11-20 (5,1)
 
 A java update pop up popped up on the control machine. 

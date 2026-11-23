@@ -1,3 +1,6 @@
 
-check find wafer center optical executer alignment dialig
+please commit. then lets eliminate the idea of a switchable layout dir so instead there will be just one in layout/. so the program should use that location and not prompt for a location, and please make that folder and move the existing files into it.
 
+there is almost no time Savbing by combining calibration with write, so lets simplify things by making the calibration a separate `calibrate.bat` step that finds the cenetrs and writes the file without doing any exposures. Additionally for safety, after it estaablishes the calibration from the two center finds it should pick a 3rd location from the run-list that is maximally ortoginal to the first 2 and then do a cenetr find on that and check to make sure it lands within 0.5m of prediction and errors if not.
+
+for safety lets make each click action capture what the area looks like where the click will land. so now a click will carry a match image and a click location within that image. this does not apply to double clicks sicne thier are in fields that can have previous contents. this also measn we can eliminate some of the now redundant pre-click image checks. Onmce we implement this, the first run will prompt the operator to capture the inital images for these click checks, right?

@@ -64,7 +64,7 @@ def send_absolute_move(psl, command):
     """Enter a rounded X/Y command, send the move, and wait for it to settle."""
     x, y = command
     click(psl, "global-alignment-tab")
-    psl.wait(1)
+    psl.wait(5)
     for axis, value in (("x", x), ("y", y)):
         check_frame(psl, f"check{axis}-field-label", 0.99)
         click(psl, f"{axis}-field", double=True)
